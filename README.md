@@ -1,6 +1,6 @@
 # ChronoCréateur
 
-ChronoCréateur est une application web statique en français pour créer, modifier, sauvegarder et exporter des frises chronologiques interactives. Inspirée de 'friseschronos.fr'
+ChronoCréateur est une application web statique en français pour créer, modifier, sauvegarder et exporter des frises chronologiques interactives. Inspirée de `friseschronos.fr`
 
 ## Fonctionnalités
 
