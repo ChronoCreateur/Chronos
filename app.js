@@ -897,10 +897,19 @@ function renderEvent(element, width, axisY, colors) {
   let cardX = hasEndDate ? (x + endX) / 2 - w / 2 : x - w / 2;
   cardX = clamp(cardX, 8, Math.max(8, width - w - 8));
   const connectorY = top + h < axisY ? top + h : top;
-  createSvg("line", { x1: x, y1: axisY, x2: x, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": element.connector === "solid" ? "" : colors.dotted, opacity: 0.85 }, group);
+  const dash = element.connector === "solid" ? "" : colors.dotted;
+  createSvg("line", { x1: x, y1: axisY, x2: x, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.85 }, group);
   createSvg("circle", { cx: x, cy: axisY, r: 4.8, fill: colors.bg, stroke: element.color, "stroke-width": 2.4 }, group);
   if (hasEndDate) {
-    createSvg("line", { x1: endX, y1: axisY, x2: endX, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": element.connector === "solid" ? "" : colors.dotted, opacity: 0.85 }, group);
+    createSvg("line", { x1: endX, y1: axisY, x2: endX, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.85 }, group);
+    const leftDateX = Math.min(x, endX);
+    const rightDateX = Math.max(x, endX);
+    if (leftDateX < cardX - 2) {
+      createSvg("line", { x1: leftDateX, y1: connectorY, x2: cardX, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.85 }, group);
+    }
+    if (rightDateX > cardX + w + 2) {
+      createSvg("line", { x1: cardX + w, y1: connectorY, x2: rightDateX, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.85 }, group);
+    }
     createSvg("circle", { cx: endX, cy: axisY, r: 4.8, fill: colors.bg, stroke: element.color, "stroke-width": 2.4 }, group);
   }
   renderEventShape(group, element, cardX, top, w, h, colors);
