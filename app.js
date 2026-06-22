@@ -247,6 +247,7 @@ function blankProject() {
     minorTicks: 5,
     titleBox: false,
     axisPosition: 56,
+    axisStyle: "arrow",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     elements: [],
@@ -259,6 +260,7 @@ function normalizeProject(project) {
   project.minorTicks = Number(project.minorTicks ?? 5);
   project.titleBox = project.titleBox ?? true;
   project.axisPosition = Number(project.axisPosition ?? 56);
+  project.axisStyle = project.axisStyle || "arrow";
   project.elements = (project.elements || []).map(normalizeElement);
   return project;
 }
@@ -555,6 +557,7 @@ function renderProjectFields() {
   const tickInput = $("#tickStepInput");
   const minorInput = $("#minorTicksInput");
   const axisInput = $("#axisPositionInput");
+  const axisStyleInput = $("#axisStyleInput");
   const titleBoxInput = $("#titleBoxInput");
   if (nameInput) nameInput.value = project.name;
   if (startInput) startInput.value = project.start;
@@ -564,6 +567,7 @@ function renderProjectFields() {
   if (tickInput) tickInput.value = String(project.tickStep || "auto");
   if (minorInput) minorInput.value = String(project.minorTicks ?? 5);
   if (axisInput) axisInput.value = Number(project.axisPosition ?? 56);
+  if (axisStyleInput) axisStyleInput.value = project.axisStyle || "arrow";
   if (titleBoxInput) titleBoxInput.value = String(project.titleBox ?? true);
   $("#zoomRange").value = state.view.scale;
 }
@@ -651,21 +655,47 @@ function renderTimeline() {
     label.textContent = formatYear(year);
   });
 
-  createSvg("line", {
-    x1: startX,
-    y1: axisY,
-    x2: endX - 16,
-    y2: axisY,
-    stroke: colors.axis,
-    "stroke-width": 1.8,
-  }, layers.axis);
-  createSvg("path", { d: `M ${endX - 16} ${axisY - 15} L ${endX} ${axisY} L ${endX - 16} ${axisY + 15}`, fill: "none", stroke: colors.axis, "stroke-width": 1.8, "stroke-linejoin": "round" }, layers.axis);
+  renderAxisLine(startX, endX, axisY, step, colors, project.axisStyle || "arrow");
 
   const visibleElements = project.elements.filter((element) => matchesSearch(element));
   visibleElements.filter((element) => element.type === "period").forEach((element) => renderPeriod(element, width, axisY, colors));
   visibleElements.filter((element) => element.type !== "period").forEach((element) => renderElement(element, width, axisY, colors));
   if (!project.elements.length) renderEmptyState(width, height, axisY, colors);
   renderSelection(colors);
+}
+
+function renderAxisLine(startX, endX, axisY, step, colors, style = "arrow") {
+  const axisWidth = style === "thick" ? 5 : style === "ruler" ? 3 : 1.8;
+  const baseAttrs = {
+    stroke: colors.axis,
+    "stroke-width": axisWidth,
+    "stroke-linecap": style === "rounded" || style === "thick" ? "round" : "butt",
+    "stroke-dasharray": style === "dotted" ? "8 8" : "",
+  };
+  if (style === "double") {
+    createSvg("path", { d: `M ${startX + 16} ${axisY - 15} L ${startX} ${axisY} L ${startX + 16} ${axisY + 15}`, fill: "none", stroke: colors.axis, "stroke-width": 1.8, "stroke-linejoin": "round" }, layers.axis);
+    createSvg("line", { x1: startX + 16, y1: axisY, x2: endX - 16, y2: axisY, ...baseAttrs }, layers.axis);
+    createSvg("path", { d: `M ${endX - 16} ${axisY - 15} L ${endX} ${axisY} L ${endX - 16} ${axisY + 15}`, fill: "none", stroke: colors.axis, "stroke-width": 1.8, "stroke-linejoin": "round" }, layers.axis);
+    return;
+  }
+  if (style === "line" || style === "thick" || style === "dotted" || style === "rounded" || style === "ruler") {
+    createSvg("line", { x1: startX, y1: axisY, x2: endX, y2: axisY, ...baseAttrs }, layers.axis);
+    if (style === "ruler") {
+      const rulerStep = Math.max(18, step * state.view.scale / 2);
+      for (let x = startX; x <= endX; x += rulerStep) {
+        createSvg("line", { x1: x, y1: axisY - 13, x2: x, y2: axisY + 13, stroke: colors.axis, "stroke-width": 1.2, opacity: 0.85 }, layers.axis);
+      }
+    }
+    return;
+  }
+  createSvg("line", {
+    x1: startX,
+    y1: axisY,
+    x2: endX - 16,
+    y2: axisY,
+    ...baseAttrs,
+  }, layers.axis);
+  createSvg("path", { d: `M ${endX - 16} ${axisY - 15} L ${endX} ${axisY} L ${endX - 16} ${axisY + 15}`, fill: "none", stroke: colors.axis, "stroke-width": 1.8, "stroke-linejoin": "round" }, layers.axis);
 }
 
 function renderEmptyState(width, height, axisY, colors) {
@@ -741,12 +771,12 @@ function renderElement(element, width, axisY, colors) {
   if (element.type === "line" || element.type === "arrow") return renderLine(element, width, axisY, colors);
 }
 
-function drawEventGlyph(parent, cx, cy, color, key = "plume") {
+function drawEventGlyph(parent, cx, cy, color, key = "plume", scale = 0.82, radius = 13) {
   const path = ICONS[key] || ICONS.plume;
-  createSvg("circle", { cx, cy, r: 13, fill: color, opacity: 0.14, "pointer-events": "none" }, parent);
+  createSvg("circle", { cx, cy, r: radius, fill: color, opacity: 0.14, "pointer-events": "none" }, parent);
   createSvg("path", {
     d: path,
-    transform: `translate(${cx} ${cy}) scale(0.82)`,
+    transform: `translate(${cx} ${cy}) scale(${scale})`,
     fill: "none",
     stroke: color,
     "stroke-width": 2,
@@ -827,13 +857,17 @@ function renderEvent(element, width, axisY, colors) {
   const textColor = element.fillMode === "color" ? "#ffffff" : colors.text;
   const dateColor = element.fillMode === "color" ? "#ffffff" : colors.muted;
   if (compact) {
-    const pad = element.fillMode === "color" ? 7 : 11;
-    const textWidth = w - pad * 2;
+    const pad = element.fillMode === "color" ? 8 : 12;
+    const iconColor = element.fillMode === "color" ? "#ffffff" : element.color;
+    const iconX = cardX + pad + 8;
+    const textX = cardX + pad + 23;
+    const textWidth = w - (pad * 2 + 24);
     const titleSize = Math.max(8, Number(element.fontSize || 10));
     const dateSize = Math.max(8, titleSize - 1);
-    const title = createSvg("text", { x: cardX + pad, y: top + 15, "font-size": titleSize, "font-weight": 800, fill: textColor }, group);
+    drawEventGlyph(group, iconX, top + Math.min(23, h / 2), iconColor, element.iconKey, 0.48, 8.5);
+    const title = createSvg("text", { x: textX, y: top + 15, "font-size": titleSize, "font-weight": 800, fill: textColor }, group);
     title.textContent = truncateText(element.title || "Événement", textWidth, titleSize);
-    const date = createSvg("text", { x: cardX + pad, y: top + 30, "font-size": dateSize, "font-weight": 800, fill: dateColor }, group);
+    const date = createSvg("text", { x: textX, y: top + 30, "font-size": dateSize, "font-weight": 800, fill: dateColor }, group);
     date.textContent = truncateText(eventDateLabel(element), textWidth, dateSize);
   } else {
     drawEventGlyph(group, cardX + 20, top + 22, element.fillMode === "color" ? "#ffffff" : element.color, element.iconKey);
@@ -1864,6 +1898,7 @@ function bindEvents() {
   $("#tickStepInput").addEventListener("change", (event) => updateProjectSetting("tickStep", event.target.value, "Graduation changée"));
   $("#minorTicksInput").addEventListener("change", (event) => updateProjectSetting("minorTicks", Number(event.target.value), "Détails changés"));
   $("#axisPositionInput").addEventListener("change", (event) => updateProjectSetting("axisPosition", Number(event.target.value), "Axe déplacé"));
+  $("#axisStyleInput").addEventListener("change", (event) => updateProjectSetting("axisStyle", event.target.value, "Style d’axe changé"));
   $("#titleBoxInput").addEventListener("change", (event) => updateProjectSetting("titleBox", event.target.value === "true", "Titre modifié"));
 
   const workspace = $("#workspace");

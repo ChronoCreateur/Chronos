@@ -170,10 +170,10 @@ button {
 
 .landing-stage {
   position: absolute;
-  right: max(34px, calc((100vw - 1180px) / 2));
+  right: max(18px, calc((100vw - 1180px) / 2 - 26px));
   top: 118px;
-  width: min(56vw, 720px);
-  height: min(64vh, 600px);
+  width: min(48vw, 640px);
+  height: min(62vh, 560px);
   z-index: 1;
 }
 
@@ -929,7 +929,7 @@ dialog::backdrop {
   }
 
   .landing-stage {
-    width: min(52vw, 560px);
+    width: min(46vw, 500px);
     opacity: 0.92;
   }
 

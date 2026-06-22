@@ -6,7 +6,7 @@
     <meta name="description" content="ChronoCréateur, logiciel web statique de création de frises chronologiques." />
     <title>ChronoCréateur</title>
     <link rel="icon" href="logo.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260622-styles-v6" />
+    <link rel="stylesheet" href="styles.css?v=20260622-landing-v7" />
   </head>
   <body class="landing-mode">
     <section class="landing-page" id="landingPage" aria-label="Accueil ChronoCréateur">
@@ -165,6 +165,17 @@
               </select>
             </label>
           </div>
+          <label>Style de l’axe
+            <select id="axisStyleInput">
+              <option value="arrow">Flèche simple</option>
+              <option value="double">Double flèche</option>
+              <option value="line">Ligne classique</option>
+              <option value="thick">Axe épais</option>
+              <option value="dotted">Pointillé</option>
+              <option value="ruler">Règle graduée</option>
+              <option value="rounded">Trait arrondi</option>
+            </select>
+          </label>
         </section>
 
         <section class="panel-section bonus-section">
@@ -249,6 +260,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260622-styles-v6"></script>
+    <script src="app.js?v=20260622-axis-icons-v8"></script>
   </body>
 </html>
