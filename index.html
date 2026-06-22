@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="ChronoCréateur, logiciel web statique de création de frises chronologiques." />
     <title>ChronoCréateur</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260622-chrono-locked" />
   </head>
   <body class="landing-mode">
     <section class="landing-page" id="landingPage" aria-label="Accueil ChronoCréateur">
@@ -82,9 +82,9 @@
         <button class="icon-button add-icon" data-add="annotation" title="Ajouter une annotation" aria-label="Ajouter une annotation">✎</button>
         <button class="icon-button add-icon" id="surpriseBtn" title="Ajouter une surprise" aria-label="Ajouter une surprise">?</button>
         <span class="toolbar-divider"></span>
-        <button class="icon-button" id="zoomOutBtn" title="Zoom arrière" aria-label="Zoom arrière">−</button>
-        <input id="zoomRange" type="range" min="0.15" max="40" step="0.05" value="1.5" aria-label="Niveau de zoom" />
-        <button class="icon-button" id="zoomInBtn" title="Zoom avant" aria-label="Zoom avant">＋</button>
+        <button class="icon-button" id="zoomOutBtn" title="Zoom arrière" aria-label="Zoom arrière" hidden>−</button>
+        <input id="zoomRange" type="range" min="0.15" max="40" step="0.05" value="1.5" aria-label="Niveau de zoom" hidden />
+        <button class="icon-button" id="zoomInBtn" title="Zoom avant" aria-label="Zoom avant" hidden>＋</button>
         <button class="text-button" id="fitBtn">Ajuster</button>
         <span class="toolbar-divider"></span>
         <button class="text-button" id="exportPngBtn">PNG</button>
@@ -185,6 +185,6 @@
       </section>
     </main>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=20260622-chrono-locked"></script>
   </body>
 </html>
