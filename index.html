@@ -177,6 +177,11 @@
               <option value="rounded">Trait arrondi</option>
             </select>
           </label>
+          <div class="split-fields">
+            <label>Couleur de fond<input id="backgroundColorInput" type="color" /></label>
+            <label>Image de fond<input id="backgroundFileInput" type="file" accept="image/*" /></label>
+          </div>
+          <label>URL image de fond<input id="backgroundImageInput" type="url" placeholder="https://..." /></label>
         </section>
 
         <section class="panel-section bonus-section">
@@ -224,6 +229,7 @@
           <div class="section-title">
             <h2>Projets</h2>
           </div>
+          <button class="danger-button full-width-action" id="deleteProjectBtn" type="button">Supprimer la frise</button>
           <div id="projectList" class="list-stack"></div>
         </section>
       </aside>
@@ -261,6 +267,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260622-file-export-v14"></script>
+    <script src="app.js?v=20260622-delete-frise-v18"></script>
   </body>
 </html>

@@ -308,6 +308,8 @@ function blankProject() {
     titleBox: false,
     axisPosition: 56,
     axisStyle: "arrow",
+    backgroundColor: "",
+    backgroundImage: "",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     elements: [],
@@ -321,6 +323,8 @@ function normalizeProject(project) {
   project.titleBox = project.titleBox ?? true;
   project.axisPosition = Number(project.axisPosition ?? 56);
   project.axisStyle = project.axisStyle || "arrow";
+  project.backgroundColor = project.backgroundColor || "";
+  project.backgroundImage = project.backgroundImage || "";
   project.elements = (project.elements || []).map(normalizeElement);
   return project;
 }
@@ -519,6 +523,18 @@ function truncateText(value, maxWidth, fontSize) {
   return text.length > maxChars ? `${text.slice(0, Math.max(1, maxChars - 3))}...` : text;
 }
 
+function alignedTextX(start, end, align = "start") {
+  if (align === "center") return (start + end) / 2;
+  if (align === "end") return end;
+  return start;
+}
+
+function svgAnchor(align = "start") {
+  if (align === "center") return "middle";
+  if (align === "end") return "end";
+  return "start";
+}
+
 function chooseTickStep() {
   const project = currentProject();
   if (project?.tickStep && project.tickStep !== "auto") return Number(project.tickStep);
@@ -627,6 +643,8 @@ function renderProjectFields() {
   const axisInput = $("#axisPositionInput");
   const axisStyleInput = $("#axisStyleInput");
   const titleBoxInput = $("#titleBoxInput");
+  const backgroundColorInput = $("#backgroundColorInput");
+  const backgroundImageInput = $("#backgroundImageInput");
   if (nameInput) nameInput.value = project.name;
   if (startInput) startInput.value = project.start;
   if (endInput) endInput.value = project.end;
@@ -637,6 +655,8 @@ function renderProjectFields() {
   if (axisInput) axisInput.value = Number(project.axisPosition ?? 56);
   if (axisStyleInput) axisStyleInput.value = project.axisStyle || "arrow";
   if (titleBoxInput) titleBoxInput.value = String(project.titleBox ?? true);
+  if (backgroundColorInput) backgroundColorInput.value = project.backgroundColor || (STYLE_PRESETS[project.style || "scolaire"] || STYLE_PRESETS.scolaire).bg;
+  if (backgroundImageInput) backgroundImageInput.value = project.backgroundImage || "";
   $("#zoomRange").value = state.view.scale;
 }
 
@@ -649,16 +669,17 @@ function renderTimeline() {
   state.bboxes.clear();
   Object.values(layers).forEach(clearLayer);
   const preset = STYLE_PRESETS[project.style || "scolaire"] || STYLE_PRESETS.scolaire;
+  const timelineBg = project.backgroundColor || preset.bg;
 
   const colors = {
-    text: project.style === "nuit" ? "#eef3f7" : css("--text"),
-    muted: project.style === "nuit" ? "#b7c0cc" : css("--muted"),
+    text: project.style === "nuit" ? "#eef3f7" : "#172033",
+    muted: project.style === "nuit" ? "#b7c0cc" : "#637083",
     line: preset.grid,
     lineStrong: preset.axis,
     surface: preset.box,
     surface2: css("--surface-2"),
     primary: css("--primary"),
-    bg: preset.bg,
+    bg: timelineBg,
     axis: preset.axis,
     shadow: preset.shadow,
     radius: preset.radius,
@@ -666,6 +687,18 @@ function renderTimeline() {
   };
 
   createSvg("rect", { x: 0, y: 0, width, height, fill: colors.bg }, layers.grid);
+  if (project.backgroundImage) {
+    createSvg("image", {
+      href: project.backgroundImage,
+      x: 0,
+      y: 0,
+      width,
+      height,
+      preserveAspectRatio: "xMidYMid slice",
+      opacity: 0.72,
+    }, layers.grid);
+    createSvg("rect", { x: 0, y: 0, width, height, fill: colors.bg, opacity: 0.18 }, layers.grid);
+  }
   const step = chooseTickStep();
   const bounds = projectBounds(project);
   $("#scaleLabel").textContent = `${formatYear(bounds.start)} → ${formatYear(bounds.end)}`;
@@ -955,25 +988,34 @@ function renderEvent(element, width, axisY, colors) {
     const pad = element.fillMode === "color" ? 8 : 12;
     const iconColor = element.fillMode === "color" ? "#ffffff" : element.color;
     const iconX = cardX + pad + 8;
-    const textX = cardX + pad + 23;
-    const textWidth = cardW - (pad * 2 + 24);
+    const textStart = cardX + pad + 23;
+    const textEnd = cardX + cardW - pad;
+    const textX = alignedTextX(textStart, textEnd, element.align);
+    const anchor = svgAnchor(element.align);
+    const textWidth = textEnd - textStart;
     const titleSize = Math.max(8, Number(element.fontSize || 10));
     const dateSize = Math.max(8, titleSize - 1);
     drawEventGlyph(group, iconX, top + Math.min(23, h / 2), iconColor, element.iconKey, 0.48, 8.5);
-    const title = createSvg("text", { x: textX, y: top + 15, "font-size": titleSize, "font-weight": 800, fill: textColor }, group);
+    const title = createSvg("text", { x: textX, y: top + 15, "font-size": titleSize, "font-weight": 800, fill: textColor, "text-anchor": anchor }, group);
     title.textContent = truncateText(element.title || "Événement", textWidth, titleSize);
-    const date = createSvg("text", { x: textX, y: top + 30, "font-size": dateSize, "font-weight": 800, fill: dateColor }, group);
+    const date = createSvg("text", { x: textX, y: top + 30, "font-size": dateSize, "font-weight": 800, fill: dateColor, "text-anchor": anchor }, group);
     date.textContent = truncateText(eventDateLabel(element), textWidth, dateSize);
   } else {
     drawEventGlyph(group, cardX + 20, top + 22, element.fillMode === "color" ? "#ffffff" : element.color, element.iconKey);
-    const textWidth = cardW - 50;
-    const date = createSvg("text", { x: cardX + 38, y: top + 18, "font-size": Math.max(9, Number(element.fontSize || 11) - 1), "font-weight": 800, fill: dateColor }, group);
+    const textStart = cardX + 38;
+    const textEnd = cardX + cardW - 12;
+    const textX = alignedTextX(textStart, textEnd, element.align);
+    const anchor = svgAnchor(element.align);
+    const textWidth = textEnd - textStart;
+    const date = createSvg("text", { x: textX, y: top + 18, "font-size": Math.max(9, Number(element.fontSize || 11) - 1), "font-weight": 800, fill: dateColor, "text-anchor": anchor }, group);
     date.textContent = truncateText(eventDateLabel(element), textWidth, Math.max(9, Number(element.fontSize || 11) - 1));
-    const title = createSvg("text", { x: cardX + 38, y: top + 34, "font-size": element.fontSize || 11, "font-weight": 800, fill: textColor }, group);
+    const title = createSvg("text", { x: textX, y: top + 34, "font-size": element.fontSize || 11, "font-weight": 800, fill: textColor, "text-anchor": anchor }, group);
     title.textContent = truncateText(element.title || "Événement", textWidth, Number(element.fontSize || 11));
   }
   if (element.description && !compact) {
-    drawWrappedText(group, element.description, cardX + 10, top + 49, w - 20, Math.max(9, Number(element.fontSize || 11) - 1), element.fillMode === "color" ? "#ffffff" : colors.muted, 2);
+    const descStart = cardX + 10;
+    const descEnd = cardX + cardW - 10;
+    drawWrappedText(group, element.description, alignedTextX(descStart, descEnd, element.align), top + 49, descEnd - descStart, Math.max(9, Number(element.fontSize || 11) - 1), element.fillMode === "color" ? "#ffffff" : colors.muted, 2, svgAnchor(element.align));
   }
   if (element.image) {
     createSvg("image", { href: element.image, x: cardX + cardW - 58, y: top + h - 58, width: 44, height: 44, preserveAspectRatio: "xMidYMid slice", opacity: 0.9 }, group);
@@ -1187,6 +1229,7 @@ function renderProperties() {
     input.dataset.key = field.key;
     input.addEventListener("input", () => updateElementField(element.id, field, input));
     input.addEventListener("change", () => {
+      if (field.type === "select") updateElementField(element.id, field, input);
       state.formSnapshotOpen = false;
       saveStore("Sauvegarde auto");
     });
@@ -1421,6 +1464,23 @@ function deleteSelected() {
   clearSelection(false);
   renderAll();
   saveStore(ids.length > 1 ? "Sélection supprimée" : "Supprimé");
+}
+
+function deleteCurrentProject() {
+  const project = currentProject();
+  if (!project) return;
+  const name = project.name?.trim() || "cette frise";
+  const ok = confirm(`Supprimer définitivement "${name}" ?\n\nCette action supprime la frise de vos projets locaux. Vous ne pourrez la récupérer que si vous avez exporté un fichier .bin.`);
+  if (!ok) return;
+  state.projects = state.projects.filter((item) => item.id !== project.id);
+  if (!state.projects.length) state.projects.push(blankProject());
+  state.currentId = state.projects[0].id;
+  clearSelection(false);
+  state.history = [];
+  state.future = [];
+  fitTimeline(false);
+  renderAll();
+  saveStore("Frise supprimée");
 }
 
 function selectAllElements() {
@@ -1968,6 +2028,7 @@ function bindEvents() {
   $("#fitBtn").addEventListener("click", () => fitTimeline());
   $("#duplicateBtn").addEventListener("click", duplicateSelected);
   $("#deleteBtn").addEventListener("click", deleteSelected);
+  $("#deleteProjectBtn").addEventListener("click", deleteCurrentProject);
   $("#surpriseBtn").addEventListener("click", addSurpriseEvent);
   $("#colorPartyBtn").addEventListener("click", applySurprisePalette);
   $("#tidyBtn").addEventListener("click", tidyElements);
@@ -2043,6 +2104,14 @@ function bindEvents() {
   $("#axisPositionInput").addEventListener("change", (event) => updateProjectSetting("axisPosition", Number(event.target.value), "Axe déplacé"));
   $("#axisStyleInput").addEventListener("change", (event) => updateProjectSetting("axisStyle", event.target.value, "Style d’axe changé"));
   $("#titleBoxInput").addEventListener("change", (event) => updateProjectSetting("titleBox", event.target.value === "true", "Titre modifié"));
+  $("#backgroundColorInput").addEventListener("change", (event) => updateProjectSetting("backgroundColor", event.target.value, "Fond modifié"));
+  $("#backgroundImageInput").addEventListener("change", (event) => updateProjectSetting("backgroundImage", event.target.value.trim(), "Image de fond modifiée"));
+  $("#backgroundFileInput").addEventListener("change", (event) => {
+    const imageFile = event.target.files?.[0];
+    if (!imageFile) return;
+    loadImageFile(imageFile, (dataUrl) => updateProjectSetting("backgroundImage", dataUrl, "Image de fond ajoutée"));
+    event.target.value = "";
+  });
 
   const workspace = $("#workspace");
   workspace.addEventListener("dragover", (event) => {

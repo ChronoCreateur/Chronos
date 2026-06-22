@@ -538,6 +538,12 @@ body.has-selection .projects-section {
   min-height: 36px;
 }
 
+.full-width-action {
+  width: 100%;
+  min-height: 34px;
+  margin-bottom: 8px;
+}
+
 .bonus-actions .primary-button {
   width: 100%;
   min-height: 38px;
