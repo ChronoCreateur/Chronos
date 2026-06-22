@@ -1,6 +1,25 @@
-const STORAGE_KEY = "chronocreateur.v1";
+const STORAGE_KEY = "chronocreateur.v4";
 const BIN_MAGIC = "CHRONOCREATEUR_BIN_V1\n";
 const NS = "http://www.w3.org/2000/svg";
+
+const ICONS = {
+  plume: "M -6 -10 C 7 -14 12 -7 5 1 L -8 12 L -4 2 L -11 5 L -7 -2 Z",
+  livre: "M -11 -9 H -2 C 1 -9 2 -7 2 -5 V 11 C 1 9 -1 8 -4 8 H -11 Z M 2 -5 C 3 -7 5 -9 8 -9 H 11 V 8 H 5 C 3 8 2 9 2 11 Z",
+  etoile: "M 0 -12 L 3 -4 L 12 -4 L 5 1 L 8 10 L 0 5 L -8 10 L -5 1 L -12 -4 L -3 -4 Z",
+  theatre: "M -10 -8 Q -5 -12 0 -8 Q 5 -12 10 -8 V 0 Q 10 10 0 12 Q -10 10 -10 0 Z M -5 -2 H -1 M 1 -2 H 5 M -4 5 Q 0 8 4 5",
+  science: "M -7 -10 H 7 M -3 -10 V -2 L -10 10 H 10 L 3 -2 V -10",
+  globe: "M 0 -12 A 12 12 0 1 0 0 12 A 12 12 0 1 0 0 -12 M -12 0 H 12 M 0 -12 C -5 -7 -5 7 0 12 M 0 -12 C 5 -7 5 7 0 12",
+  eclair: "M 2 -12 L -8 2 H -1 L -3 12 L 8 -3 H 1 Z",
+  coeur: "M 0 10 C -11 2 -12 -5 -7 -8 C -3 -10 0 -6 0 -6 C 0 -6 3 -10 7 -8 C 12 -5 11 2 0 10 Z",
+};
+
+const STYLE_PRESETS = {
+  scolaire: { label: "Scolaire PDF", bg: "#fbfbfa", axis: "#5d646b", grid: "#d6d9dd", box: "#ffffff", shadow: 0.05, radius: 1, dotted: "2 2" },
+  moderne: { label: "Moderne", bg: "#f3f5f8", axis: "#172033", grid: "#d8dee8", box: "#ffffff", shadow: 0.13, radius: 8, dotted: "4 4" },
+  minimal: { label: "Minimal noir et blanc", bg: "#ffffff", axis: "#222222", grid: "#e4e4e4", box: "#ffffff", shadow: 0, radius: 0, dotted: "1 3" },
+  nuit: { label: "Nuit", bg: "#11151b", axis: "#eef3f7", grid: "#2d3745", box: "#171d25", shadow: 0.22, radius: 6, dotted: "4 4" },
+  couleur: { label: "Couleurs vives", bg: "#fffaf3", axis: "#263238", grid: "#edd9bd", box: "#fffdf9", shadow: 0.12, radius: 5, dotted: "3 3" },
+};
 
 const $ = (selector) => document.querySelector(selector);
 const svg = $("#timelineSvg");
@@ -16,6 +35,7 @@ const state = {
   projects: [],
   currentId: null,
   selectedId: null,
+  selectedIds: new Set(),
   view: { center: 1900, scale: 1.5 },
   printSize: "a4",
   history: [],
@@ -28,6 +48,28 @@ const state = {
 };
 
 const templates = [
+  {
+    id: "auteurs-francais",
+    name: "Auteur et autrices de français en 4'eme",
+    start: 1500,
+    end: 2026,
+    style: "scolaire",
+    tickStep: "50",
+    minorTicks: 10,
+    titleBox: true,
+    axisPosition: 56,
+    elements: [
+      event("Pierre de Ronsard", 1524, "1524 à 1585", "plume", "#173fbd", -92),
+      event("Louise Labé", 1524, "1524 à 1566", "plume", "#2f8bd9", 34),
+      event("Victor Hugo", 1802, "1802 à 1885", "livre", "#666666", -122),
+      event("Joris-Karl Huysmans", 1848, "1848 à 1907", "livre", "#666666", 72),
+      event("Edmond Rostand", 1868, "1868 à 1918", "theatre", "#666666", 42),
+      event("Guillaume Apollinaire", 1880, "1880 à 1918", "plume", "#666666", -84),
+      event("Jacques Prévert", 1900, "1900 à 1977", "plume", "#ff1b16", -122),
+      event("Raymond Queneau", 1903, "1903 à 1976", "livre", "#ff1b16", -50),
+      event("Grand Corps Malade", 1977, "1977 à 2026", "coeur", "#ff1b16", 36),
+    ].map((item) => ({ ...item, width: 128, height: 44, fontSize: 9, shape: "sharp", fillMode: ["#173fbd", "#2f8bd9", "#ff1b16"].includes(item.color) ? "color" : "white" })),
+  },
   {
     id: "world",
     name: "Histoire mondiale",
@@ -124,12 +166,16 @@ function event(title, date, description, icon, color, y) {
     icon,
     color,
     y,
-    width: 210,
-    height: 112,
-    fontSize: 14,
+    width: 150,
+    height: 54,
+    fontSize: 11,
     opacity: 1,
     align: "start",
     image: "",
+    iconKey: ICONS[icon] ? icon : "plume",
+    shape: "sharp",
+    connector: "dotted",
+    fillMode: "white",
   };
 }
 
@@ -200,39 +246,57 @@ function createProjectFromTemplate(template) {
   const copy = clone(template);
   copy.id = uid();
   copy.name = template.name;
+  copy.style = copy.style || "scolaire";
+  copy.tickStep = copy.tickStep || "auto";
+  copy.minorTicks = copy.minorTicks ?? 5;
+  copy.titleBox = copy.titleBox ?? true;
   copy.createdAt = new Date().toISOString();
   copy.updatedAt = new Date().toISOString();
-  copy.elements = copy.elements.map((element) => ({ ...element, id: uid() }));
+  copy.elements = copy.elements.map((element) => normalizeElement({ ...element, id: uid() }));
   return copy;
 }
 
 function blankProject() {
   return {
     id: uid(),
-    name: "Nouvelle frise",
-    start: -500,
-    end: 2050,
+    name: "",
+    start: 1500,
+    end: 2026,
+    style: "scolaire",
+    tickStep: "50",
+    minorTicks: 5,
+    titleBox: false,
+    axisPosition: 56,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    elements: [
-      period("Période exemple", 1200, 1600, "#1f7a6d", 52, 32),
-      event("Événement à modifier", 1492, "Sélectionnez cette carte pour changer ses propriétés.", "★", "#c95f32", -184),
-      {
-        id: uid(),
-        type: "annotation",
-        title: "Conseil",
-        text: "Glissez les objets, zoomez avec la molette et exportez votre frise en PNG ou .bin.",
-        date: 1750,
-        y: 110,
-        width: 260,
-        height: 82,
-        color: "#5762b7",
-        fontSize: 14,
-        opacity: 0.95,
-        align: "start",
-      },
-    ],
+    elements: [],
   };
+}
+
+function normalizeProject(project) {
+  project.style = project.style || "scolaire";
+  project.tickStep = project.tickStep || "auto";
+  project.minorTicks = Number(project.minorTicks ?? 5);
+  project.titleBox = project.titleBox ?? true;
+  project.axisPosition = Number(project.axisPosition ?? 56);
+  project.elements = (project.elements || []).map(normalizeElement);
+  return project;
+}
+
+function normalizeElement(element) {
+  if (element.type === "event") {
+    element.iconKey = element.iconKey || "plume";
+    element.shape = element.shape || "box";
+    element.connector = element.connector || "dotted";
+    element.width = Number(element.width || 150);
+    element.height = Number(element.height || 54);
+    element.fontSize = Number(element.fontSize || 11);
+  }
+  if (element.type === "period") {
+    element.height = Number(element.height || 24);
+    element.opacity = element.opacity ?? 0.88;
+  }
+  return element;
 }
 
 function loadStore() {
@@ -240,7 +304,7 @@ function loadStore() {
   if (stored) {
     try {
       const data = JSON.parse(stored);
-      state.projects = Array.isArray(data.projects) ? data.projects : [];
+      state.projects = Array.isArray(data.projects) ? data.projects.map(normalizeProject) : [];
       state.currentId = data.currentId || state.projects[0]?.id;
       state.view = data.view || state.view;
       state.printSize = data.printSize || "a4";
@@ -251,12 +315,13 @@ function loadStore() {
   }
 
   if (!state.projects.length) {
-    state.projects = [createProjectFromTemplate(templates[0])];
+    state.projects = [blankProject()];
     state.currentId = state.projects[0].id;
   }
 
   document.body.classList.toggle("dark", state.isDark);
-  $("#printSizeInput").value = state.printSize;
+  const printInput = $("#printSizeInput");
+  if (printInput) printInput.value = state.printSize;
 }
 
 function saveStore(label = "Sauvegardé") {
@@ -287,7 +352,7 @@ function pushHistory() {
 function restoreProject(snapshot) {
   const index = state.projects.findIndex((project) => project.id === snapshot.id);
   if (index >= 0) state.projects[index] = clone(snapshot);
-  state.selectedId = null;
+  clearSelection(false);
   renderAll();
   saveStore("Restauré");
 }
@@ -379,6 +444,8 @@ function formatYear(year) {
 }
 
 function chooseTickStep() {
+  const project = currentProject();
+  if (project?.tickStep && project.tickStep !== "auto") return Number(project.tickStep);
   const targetYears = 120 / state.view.scale;
   const magnitude = 10 ** Math.floor(Math.log10(Math.max(1, targetYears)));
   const steps = [1, 2, 5, 10].map((n) => n * magnitude);
@@ -389,6 +456,39 @@ function scaleLabel(step) {
   if (step >= 1000) return `Repères tous les ${step / 1000} millénaire${step >= 2000 ? "s" : ""}`;
   if (step >= 100) return `Repères tous les ${step / 100} siècle${step >= 200 ? "s" : ""}`;
   return `Repères tous les ${step} an${step > 1 ? "s" : ""}`;
+}
+
+function selectionIds() {
+  return [...state.selectedIds].filter((id) => currentProject()?.elements.some((element) => element.id === id));
+}
+
+function clearSelection(render = true) {
+  state.selectedId = null;
+  state.selectedIds = new Set();
+  state.formSnapshotOpen = false;
+  if (render) {
+    renderTimeline();
+    renderProperties();
+  }
+}
+
+function setSelection(ids, render = true) {
+  const valid = ids.filter((id) => currentProject()?.elements.some((element) => element.id === id));
+  state.selectedIds = new Set(valid);
+  state.selectedId = valid.length === 1 ? valid[0] : valid[0] || null;
+  state.formSnapshotOpen = false;
+  if (render) {
+    renderTimeline();
+    renderProperties();
+  }
+}
+
+function selectionTargets(fallbackToAll = false) {
+  const project = currentProject();
+  if (!project) return [];
+  const ids = selectionIds();
+  if (ids.length) return project.elements.filter((element) => ids.includes(element.id));
+  return fallbackToAll ? project.elements : [];
 }
 
 function renderAll() {
@@ -411,7 +511,7 @@ function renderLists() {
       const project = createProjectFromTemplate(template);
       state.projects.unshift(project);
       state.currentId = project.id;
-      state.selectedId = null;
+      clearSelection(false);
       fitTimeline();
       saveStore("Modèle ouvert");
       renderAll();
@@ -424,10 +524,10 @@ function renderLists() {
   state.projects.forEach((project) => {
     const button = document.createElement("button");
     button.className = `list-item${project.id === state.currentId ? " active" : ""}`;
-    button.innerHTML = `<strong>${escapeHtml(project.name)}</strong><span>${project.elements.length} élément${project.elements.length > 1 ? "s" : ""}</span>`;
+    button.innerHTML = `<strong>${escapeHtml(project.name || "Projet vide")}</strong><span>${project.elements.length} élément${project.elements.length > 1 ? "s" : ""}</span>`;
     button.addEventListener("click", () => {
       state.currentId = project.id;
-      state.selectedId = null;
+      clearSelection(false);
       state.history = [];
       state.future = [];
       fitTimeline(false);
@@ -445,10 +545,20 @@ function renderProjectFields() {
   const startInput = $("#projectStartInput");
   const endInput = $("#projectEndInput");
   const printInput = $("#printSizeInput");
+  const styleInput = $("#projectStyleInput");
+  const tickInput = $("#tickStepInput");
+  const minorInput = $("#minorTicksInput");
+  const axisInput = $("#axisPositionInput");
+  const titleBoxInput = $("#titleBoxInput");
   if (nameInput) nameInput.value = project.name;
   if (startInput) startInput.value = project.start;
   if (endInput) endInput.value = project.end;
   if (printInput) printInput.value = state.printSize;
+  if (styleInput) styleInput.value = project.style || "scolaire";
+  if (tickInput) tickInput.value = String(project.tickStep || "auto");
+  if (minorInput) minorInput.value = String(project.minorTicks ?? 5);
+  if (axisInput) axisInput.value = Number(project.axisPosition ?? 56);
+  if (titleBoxInput) titleBoxInput.value = String(project.titleBox ?? true);
   $("#zoomRange").value = state.view.scale;
 }
 
@@ -456,20 +566,25 @@ function renderTimeline() {
   const project = currentProject();
   const { width, height } = getSize();
   fitViewToProject(width);
-  const axisY = Math.round(height * 0.56);
+  const axisY = Math.round(height * clamp(Number(project.axisPosition ?? 56), 25, 75) / 100);
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
   state.bboxes.clear();
   Object.values(layers).forEach(clearLayer);
+  const preset = STYLE_PRESETS[project.style || "scolaire"] || STYLE_PRESETS.scolaire;
 
   const colors = {
-    text: css("--text"),
-    muted: css("--muted"),
-    line: css("--line"),
-    lineStrong: css("--line-strong"),
-    surface: css("--surface"),
+    text: project.style === "nuit" ? "#eef3f7" : css("--text"),
+    muted: project.style === "nuit" ? "#b7c0cc" : css("--muted"),
+    line: preset.grid,
+    lineStrong: preset.axis,
+    surface: preset.box,
     surface2: css("--surface-2"),
     primary: css("--primary"),
-    bg: css("--bg"),
+    bg: preset.bg,
+    axis: preset.axis,
+    shadow: preset.shadow,
+    radius: preset.radius,
+    dotted: preset.dotted,
   };
 
   createSvg("rect", { x: 0, y: 0, width, height, fill: colors.bg }, layers.grid);
@@ -478,17 +593,39 @@ function renderTimeline() {
   $("#scaleLabel").textContent = `${formatYear(bounds.start)} → ${formatYear(bounds.end)}`;
   const startYear = Math.ceil(bounds.start / step) * step;
   const endYear = Math.floor(bounds.end / step) * step;
+  const startX = yearToX(bounds.start, width);
+  const endX = yearToX(bounds.end, width);
+  const minorCount = Math.max(0, Number(project.minorTicks ?? 5));
+  const minorStep = minorCount ? step / minorCount : 0;
+
+  const projectTitle = String(project.name || "").trim();
+  if (project.titleBox !== false && projectTitle) {
+    const titleW = Math.min(520, Math.max(260, projectTitle.length * 9 + 32));
+    const titleX = Math.max(28, Math.min(width - titleW - 28, width * 0.16));
+    createSvg("rect", { x: titleX, y: 54, width: titleW, height: 30, fill: colors.bg, stroke: colors.axis, "stroke-width": 1.2, rx: colors.radius }, layers.axis);
+    const title = createSvg("text", { x: titleX + 10, y: 75, "font-size": 16, "font-weight": 800, fill: colors.text }, layers.axis);
+    title.textContent = projectTitle;
+  }
+
+  if (minorStep > 0) {
+    const minorStart = Math.ceil(bounds.start / minorStep) * minorStep;
+    for (let year = minorStart; year <= bounds.end; year += minorStep) {
+      if (Math.abs(year / step - Math.round(year / step)) < 0.0001) continue;
+      const x = yearToX(year, width);
+      if (x < startX || x > endX) continue;
+      createSvg("line", { x1: x, y1: axisY - 5, x2: x, y2: axisY + 5, stroke: colors.axis, "stroke-width": 0.9, opacity: 0.75 }, layers.axis);
+    }
+  }
 
   for (let year = startYear; year <= endYear; year += step) {
     const x = yearToX(year, width);
-    if (x < 0 || x > width) continue;
-    createSvg("line", { x1: x, y1: 0, x2: x, y2: height, stroke: colors.line, "stroke-width": 1, opacity: 0.65 }, layers.grid);
-    createSvg("line", { x1: x, y1: axisY - 16, x2: x, y2: axisY + 16, stroke: colors.lineStrong, "stroke-width": 1 }, layers.axis);
+    if (x < startX || x > endX) continue;
+    createSvg("line", { x1: x, y1: axisY - 9, x2: x, y2: axisY + 9, stroke: colors.axis, "stroke-width": 1.1 }, layers.axis);
     const label = createSvg("text", {
       x,
-      y: axisY + 36,
+      y: axisY + 30,
       "text-anchor": "middle",
-      "font-size": 12,
+      "font-size": 11,
       fill: colors.muted,
     }, layers.axis);
     label.textContent = formatYear(year);
@@ -496,31 +633,44 @@ function renderTimeline() {
 
   [bounds.start, bounds.end].forEach((year) => {
     const x = yearToX(year, width);
-    createSvg("line", { x1: x, y1: 0, x2: x, y2: height, stroke: colors.primary, "stroke-width": 2, opacity: 0.45 }, layers.axis);
+    createSvg("line", { x1: x, y1: axisY - 18, x2: x, y2: axisY + 18, stroke: colors.axis, "stroke-width": 1.3 }, layers.axis);
     const label = createSvg("text", {
       x: clamp(x, 44, width - 44),
-      y: axisY + 58,
+      y: axisY + 52,
       "text-anchor": "middle",
       "font-size": 12,
       "font-weight": 800,
-      fill: colors.primary,
+      fill: colors.axis,
     }, layers.axis);
     label.textContent = formatYear(year);
   });
 
   createSvg("line", {
-    x1: yearToX(bounds.start, width),
+    x1: startX,
     y1: axisY,
-    x2: yearToX(bounds.end, width),
+    x2: endX - 16,
     y2: axisY,
-    stroke: colors.text,
-    "stroke-width": 2.5,
+    stroke: colors.axis,
+    "stroke-width": 1.8,
   }, layers.axis);
+  createSvg("path", { d: `M ${endX - 16} ${axisY - 15} L ${endX} ${axisY} L ${endX - 16} ${axisY + 15}`, fill: "none", stroke: colors.axis, "stroke-width": 1.8, "stroke-linejoin": "round" }, layers.axis);
 
   const visibleElements = project.elements.filter((element) => matchesSearch(element));
   visibleElements.filter((element) => element.type === "period").forEach((element) => renderPeriod(element, width, axisY, colors));
   visibleElements.filter((element) => element.type !== "period").forEach((element) => renderElement(element, width, axisY, colors));
+  if (!project.elements.length) renderEmptyState(width, height, axisY, colors);
   renderSelection(colors);
+}
+
+function renderEmptyState(width, height, axisY, colors) {
+  const boxW = Math.min(460, width - 80);
+  const boxX = (width - boxW) / 2;
+  const boxY = Math.max(92, axisY - 155);
+  createSvg("rect", { x: boxX, y: boxY, width: boxW, height: 88, rx: 8, fill: colors.surface, stroke: colors.line, "stroke-width": 1.2, opacity: 0.96 }, layers.item);
+  const title = createSvg("text", { x: width / 2, y: boxY + 34, "text-anchor": "middle", "font-size": 16, "font-weight": 800, fill: colors.text }, layers.item);
+  title.textContent = "Frise vide";
+  const copy = createSvg("text", { x: width / 2, y: boxY + 60, "text-anchor": "middle", "font-size": 12, fill: colors.muted }, layers.item);
+  copy.textContent = "Ajoutez un événement avec ★, une période avec ▰, ou ouvrez un modèle à gauche.";
 }
 
 function matchesSearch(element) {
@@ -566,47 +716,45 @@ function renderElement(element, width, axisY, colors) {
   if (element.type === "line" || element.type === "arrow") return renderLine(element, width, axisY, colors);
 }
 
-function drawEventGlyph(parent, cx, cy, color) {
-  createSvg("circle", { cx, cy, r: 18, fill: color, opacity: 0.16 }, parent);
+function drawEventGlyph(parent, cx, cy, color, key = "plume") {
+  const path = ICONS[key] || ICONS.plume;
+  createSvg("circle", { cx, cy, r: 13, fill: color, opacity: 0.14, "pointer-events": "none" }, parent);
   createSvg("path", {
-    d: [
-      `M ${cx} ${cy - 12}`,
-      `L ${cx + 3.8} ${cy - 3.8}`,
-      `L ${cx + 12} ${cy}`,
-      `L ${cx + 3.8} ${cy + 3.8}`,
-      `L ${cx} ${cy + 12}`,
-      `L ${cx - 3.8} ${cy + 3.8}`,
-      `L ${cx - 12} ${cy}`,
-      `L ${cx - 3.8} ${cy - 3.8}`,
-      "Z",
-    ].join(" "),
-    fill: color,
-    opacity: 0.95,
+    d: path,
+    transform: `translate(${cx} ${cy}) scale(0.82)`,
+    fill: "none",
+    stroke: color,
+    "stroke-width": 2,
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
     "pointer-events": "none",
   }, parent);
-  createSvg("circle", { cx, cy, r: 3.2, fill: "#ffffff", opacity: 0.9, "pointer-events": "none" }, parent);
 }
 
 function renderEvent(element, width, axisY, colors) {
   const x = yearToX(element.date, width);
   const y = axisY + Number(element.y || -160);
-  const w = Number(element.width || 210);
-  const h = Number(element.height || 112);
+  const w = Number(element.width || 150);
+  const h = Number(element.height || 54);
   const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.item);
   const top = y;
-  const cardX = x - w / 2;
-  const connectorY = top + h + 2 < axisY ? top + h : top;
-  createSvg("line", { x1: x, y1: axisY, x2: x, y2: connectorY, stroke: element.color, "stroke-width": 2, opacity: 0.72 }, group);
-  createSvg("circle", { cx: x, cy: axisY, r: 6, fill: colors.surface, stroke: element.color, "stroke-width": 3 }, group);
-  createSvg("rect", { class: "event-card", x: cardX, y: top, width: w, height: h, rx: 8, fill: colors.surface, stroke: colors.line }, group);
-  createSvg("rect", { x: cardX, y: top, width: 8, height: h, rx: 4, fill: element.color, opacity: element.opacity ?? 1 }, group);
-  drawEventGlyph(group, cardX + 31, top + 31, element.color);
-  const date = createSvg("text", { x: cardX + 58, y: top + 25, "font-size": 11, "font-weight": 800, fill: colors.muted }, group);
+  let cardX = x - w / 2;
+  if (element.align === "start") cardX = x + 7;
+  if (element.align === "end") cardX = x - w - 7;
+  cardX = clamp(cardX, 8, Math.max(8, width - w - 8));
+  const connectorY = top + h < axisY ? top + h : top;
+  createSvg("line", { x1: x, y1: axisY, x2: x, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": element.connector === "solid" ? "" : colors.dotted, opacity: 0.85 }, group);
+  createSvg("circle", { cx: x, cy: axisY, r: 4.8, fill: colors.bg, stroke: element.color, "stroke-width": 2.4 }, group);
+  createSvg("rect", { class: "event-card", x: cardX, y: top, width: w, height: h, rx: element.shape === "sharp" ? 0 : colors.radius, fill: element.fillMode === "color" ? element.color : colors.surface, stroke: element.color, "stroke-width": 1.4, opacity: element.opacity ?? 1 }, group);
+  if (element.fillMode !== "color") createSvg("rect", { x: cardX, y: top, width: 6, height: h, rx: element.shape === "sharp" ? 0 : colors.radius, fill: element.color, opacity: 1 }, group);
+  const textColor = element.fillMode === "color" ? "#ffffff" : colors.text;
+  drawEventGlyph(group, cardX + 20, top + 22, element.fillMode === "color" ? "#ffffff" : element.color, element.iconKey);
+  const date = createSvg("text", { x: cardX + 38, y: top + 18, "font-size": Math.max(9, Number(element.fontSize || 11) - 1), "font-weight": 800, fill: element.fillMode === "color" ? "#ffffff" : colors.muted }, group);
   date.textContent = formatYear(element.date);
-  const title = createSvg("text", { x: cardX + 58, y: top + 46, "font-size": element.fontSize || 14, "font-weight": 800, fill: colors.text }, group);
+  const title = createSvg("text", { x: cardX + 38, y: top + 34, "font-size": element.fontSize || 11, "font-weight": 800, fill: textColor }, group);
   title.textContent = element.title || "Événement";
   if (element.description) {
-    drawWrappedText(group, element.description, cardX + 14, top + 72, w - 28, element.fontSize || 13, colors.muted, 2);
+    drawWrappedText(group, element.description, cardX + 10, top + 49, w - 20, Math.max(9, Number(element.fontSize || 11) - 1), element.fillMode === "color" ? "#ffffff" : colors.muted, 2);
   }
   if (element.image) {
     createSvg("image", { href: element.image, x: cardX + w - 58, y: top + h - 58, width: 44, height: 44, preserveAspectRatio: "xMidYMid slice", opacity: 0.9 }, group);
@@ -698,27 +846,63 @@ function drawWrappedText(parent, value, x, y, maxWidth, fontSize, fill, maxLines
 
 function renderSelection(colors) {
   clearLayer(layers.selection);
-  if (!state.selectedId || !state.bboxes.has(state.selectedId)) return;
-  const box = state.bboxes.get(state.selectedId);
-  createSvg("rect", {
-    class: "selected-outline",
-    x: box.x - 6,
-    y: box.y - 6,
-    width: box.width + 12,
-    height: box.height + 12,
-    rx: 9,
-    stroke: colors.primary,
-    fill: "none",
-    "stroke-width": 2,
-    "stroke-dasharray": "6 5",
-  }, layers.selection);
+  const selected = selectionIds().filter((id) => state.bboxes.has(id));
+  selected.forEach((id) => {
+    const box = state.bboxes.get(id);
+    createSvg("rect", {
+      class: "selected-outline",
+      x: box.x - 6,
+      y: box.y - 6,
+      width: box.width + 12,
+      height: box.height + 12,
+      rx: 9,
+      stroke: colors.primary,
+      fill: "none",
+      "stroke-width": 2,
+      "stroke-dasharray": "6 5",
+    }, layers.selection);
+  });
 
-  if (box.kind === "line") {
-    createSvg("circle", { class: "resize-handle", "data-id": state.selectedId, "data-handle": "start", cx: box.x, cy: box.y + box.height / 2, r: 7, fill: colors.surface, stroke: colors.primary, "stroke-width": 2 }, layers.selection);
-    createSvg("circle", { class: "resize-handle", "data-id": state.selectedId, "data-handle": "end", cx: box.x + box.width, cy: box.y + box.height / 2, r: 7, fill: colors.surface, stroke: colors.primary, "stroke-width": 2 }, layers.selection);
-  } else if (box.kind !== "period") {
-    createSvg("rect", { class: "resize-handle", "data-id": state.selectedId, "data-handle": "resize", x: box.x + box.width - 5, y: box.y + box.height - 5, width: 10, height: 10, rx: 3, fill: colors.surface, stroke: colors.primary, "stroke-width": 2 }, layers.selection);
+  if (selected.length === 1) {
+    const id = selected[0];
+    const box = state.bboxes.get(id);
+    if (box.kind === "line") {
+      createSvg("circle", { class: "resize-handle", "data-id": id, "data-handle": "start", cx: box.x, cy: box.y + box.height / 2, r: 7, fill: colors.surface, stroke: colors.primary, "stroke-width": 2 }, layers.selection);
+      createSvg("circle", { class: "resize-handle", "data-id": id, "data-handle": "end", cx: box.x + box.width, cy: box.y + box.height / 2, r: 7, fill: colors.surface, stroke: colors.primary, "stroke-width": 2 }, layers.selection);
+    } else if (box.kind !== "period") {
+      createSvg("rect", { class: "resize-handle", "data-id": id, "data-handle": "resize", x: box.x + box.width - 5, y: box.y + box.height - 5, width: 10, height: 10, rx: 3, fill: colors.surface, stroke: colors.primary, "stroke-width": 2 }, layers.selection);
+    }
   }
+
+  if (state.dragging?.mode === "marquee") {
+    const rect = normalizedRect(state.dragging.startPoint, state.dragging.currentPoint);
+    createSvg("rect", {
+      class: "marquee-rect",
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+      rx: 4,
+      fill: colors.primary,
+      opacity: 0.12,
+      stroke: colors.primary,
+      "stroke-width": 1.5,
+      "stroke-dasharray": "5 4",
+    }, layers.selection);
+  }
+}
+
+function normalizedRect(a, b) {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    width: Math.abs(a.x - b.x),
+    height: Math.abs(a.y - b.y),
+  };
+}
+
+function intersectsRect(a, b) {
+  return a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y;
 }
 
 function isChronologicalElement(element) {
@@ -730,13 +914,21 @@ function renderProperties() {
   const title = $("#propertiesTitle");
   const actions = document.querySelector(".property-actions");
   const project = currentProject();
-  const element = project?.elements.find((item) => item.id === state.selectedId);
+  const selected = selectionTargets(false);
+  const element = selected.length === 1 ? selected[0] : null;
   state.formSnapshotOpen = false;
   form.innerHTML = "";
-  $("#duplicateBtn").disabled = !element;
-  $("#deleteBtn").disabled = !element;
-  document.body.classList.toggle("has-selection", Boolean(element));
-  actions?.classList.toggle("is-hidden", !element);
+  $("#duplicateBtn").disabled = !selected.length;
+  $("#deleteBtn").disabled = !selected.length;
+  document.body.classList.toggle("has-selection", Boolean(selected.length === 1));
+  actions?.classList.toggle("is-hidden", !selected.length);
+  updateSelectionUi();
+
+  if (selected.length > 1) {
+    if (title) title.textContent = "Sélection multiple";
+    form.innerHTML = `<p class="edit-hint">${selected.length} éléments sélectionnés. Utilisez Supprimer, Dupliquer ou l’éditeur avancé pour modifier le groupe.</p>`;
+    return;
+  }
 
   if (!element) {
     if (title) title.textContent = "Édition";
@@ -819,10 +1011,32 @@ function fieldsFor(element) {
       { key: "date", label: "Date", type: "number" },
       { key: "description", label: "Description", type: "textarea" },
       { key: "image", label: "URL de l'image", type: "url" },
+      { key: "iconKey", label: "Icône", type: "select", options: [
+        { value: "plume", label: "Plume" },
+        { value: "livre", label: "Livre" },
+        { value: "etoile", label: "Étoile" },
+        { value: "theatre", label: "Théâtre" },
+        { value: "science", label: "Science" },
+        { value: "globe", label: "Globe" },
+        { value: "eclair", label: "Éclair" },
+        { value: "coeur", label: "Cœur" },
+      ] },
+      { key: "shape", label: "Forme", type: "select", options: [
+        { value: "box", label: "Boîte douce" },
+        { value: "sharp", label: "Rectangle PDF" },
+      ] },
+      { key: "connector", label: "Connecteur", type: "select", options: [
+        { value: "dotted", label: "Pointillé" },
+        { value: "solid", label: "Trait plein" },
+      ] },
+      { key: "fillMode", label: "Remplissage", type: "select", options: [
+        { value: "white", label: "Fond clair" },
+        { value: "color", label: "Bloc couleur" },
+      ] },
       ...common,
       ...typography,
-      { key: "width", label: "Largeur", type: "number", min: 120, max: 520 },
-      { key: "height", label: "Hauteur", type: "number", min: 72, max: 320 },
+      { key: "width", label: "Largeur", type: "number", min: 90, max: 520 },
+      { key: "height", label: "Hauteur", type: "number", min: 42, max: 320 },
       { key: "y", label: "Position verticale", type: "number" },
     ];
   }
@@ -910,39 +1124,168 @@ function addElement(type, image = "") {
   if (type === "annotation") element = { id: uid(), type: "annotation", title: "Annotation", text: "Annotation", date: center, y: 116, width: 220, height: 78, color: "#5762b7", fontSize: 15, opacity: 0.95, align: "start" };
   keepElementInProject(element);
   project.elements.push(element);
-  state.selectedId = element.id;
+  setSelection([element.id], false);
   renderAll();
   saveStore("Élément ajouté");
 }
 
 function duplicateSelected() {
   const project = currentProject();
-  const element = project.elements.find((item) => item.id === state.selectedId);
-  if (!element) return;
+  const targets = selectionTargets(false);
+  if (!targets.length) return;
   pushHistory();
-  const copy = clone(element);
-  copy.id = uid();
-  if ("date" in copy) copy.date = Number(copy.date) + Math.round(40 / state.view.scale);
-  if ("start" in copy) {
-    copy.start = Number(copy.start) + Math.round(40 / state.view.scale);
-    copy.end = Number(copy.end) + Math.round(40 / state.view.scale);
-  }
-  copy.y = Number(copy.y || 0) + 28;
-  keepElementInProject(copy);
-  project.elements.push(copy);
-  state.selectedId = copy.id;
+  const shift = Math.max(1, Math.round(40 / state.view.scale));
+  const copies = targets.map((element) => {
+    const copy = clone(element);
+    copy.id = uid();
+    if ("date" in copy && !isChronologicalElement(copy)) copy.date = Number(copy.date) + shift;
+    if ("start" in copy && !isChronologicalElement(copy)) {
+      copy.start = Number(copy.start) + shift;
+      copy.end = Number(copy.end) + shift;
+    }
+    copy.y = Number(copy.y || 0) + 28;
+    keepElementInProject(copy);
+    return copy;
+  });
+  project.elements.push(...copies);
+  setSelection(copies.map((copy) => copy.id), false);
   renderAll();
-  saveStore("Dupliqué");
+  saveStore(copies.length > 1 ? "Sélection dupliquée" : "Dupliqué");
+}
+
+function updateProjectSetting(key, value, label = "Frise modifiée") {
+  const project = currentProject();
+  if (!project) return;
+  pushHistory();
+  project[key] = value;
+  normalizeProject(project);
+  renderAll();
+  saveStore(label);
 }
 
 function deleteSelected() {
   const project = currentProject();
-  if (!state.selectedId) return;
+  const ids = selectionIds();
+  if (!ids.length) return;
   pushHistory();
-  project.elements = project.elements.filter((item) => item.id !== state.selectedId);
-  state.selectedId = null;
+  project.elements = project.elements.filter((item) => !ids.includes(item.id));
+  clearSelection(false);
   renderAll();
-  saveStore("Supprimé");
+  saveStore(ids.length > 1 ? "Sélection supprimée" : "Supprimé");
+}
+
+function selectAllElements() {
+  const project = currentProject();
+  setSelection(project?.elements.map((element) => element.id) || []);
+}
+
+function invertSelection() {
+  const project = currentProject();
+  if (!project) return;
+  const selected = new Set(selectionIds());
+  setSelection(project.elements.filter((element) => !selected.has(element.id)).map((element) => element.id));
+}
+
+function applyBulkColor() {
+  const targets = selectionTargets(false);
+  if (!targets.length) return;
+  const color = $("#bulkColorInput")?.value || "#1f7a6d";
+  pushHistory();
+  targets.forEach((element) => {
+    element.color = color;
+  });
+  renderAll();
+  saveStore("Couleur appliquée");
+}
+
+function spreadSelectedVertically() {
+  const targets = selectionTargets(true);
+  if (!targets.length) return;
+  const sorted = targets.slice().sort((a, b) => Number(a.date ?? a.start ?? 0) - Number(b.date ?? b.start ?? 0));
+  const top = -210;
+  const bottom = 168;
+  const step = sorted.length > 1 ? (bottom - top) / (sorted.length - 1) : 0;
+  pushHistory();
+  sorted.forEach((element, index) => {
+    element.y = Math.round(top + step * index);
+  });
+  renderAll();
+  saveStore("Réparti verticalement");
+}
+
+function alternateSelectedLanes() {
+  const targets = selectionTargets(true);
+  if (!targets.length) return;
+  const lanes = [-166, 76, -96, 138, -224, 196];
+  pushHistory();
+  targets
+    .slice()
+    .sort((a, b) => Number(a.date ?? a.start ?? 0) - Number(b.date ?? b.start ?? 0))
+    .forEach((element, index) => {
+      element.y = lanes[index % lanes.length];
+    });
+  renderAll();
+  saveStore("Lignes alternées");
+}
+
+function applyCompactPdfStyle() {
+  const targets = selectionTargets(true);
+  if (!targets.length) return;
+  pushHistory();
+  targets.forEach((element) => {
+    if (element.type === "event") {
+      element.width = 128;
+      element.height = 44;
+      element.fontSize = 9;
+      element.shape = "sharp";
+      element.connector = "dotted";
+      element.fillMode = element.fillMode || "white";
+    }
+    if (element.type === "period") {
+      element.height = 24;
+      element.opacity = 0.88;
+      element.fontSize = 12;
+    }
+    if (element.type === "text" || element.type === "annotation") {
+      element.fontSize = Math.min(Number(element.fontSize || 14), 13);
+    }
+  });
+  renderAll();
+  saveStore("Style PDF appliqué");
+}
+
+function declutterSelected() {
+  const targets = selectionTargets(true).filter((element) => element.type !== "line" && element.type !== "arrow");
+  if (!targets.length) return;
+  const lanes = [-188, -126, -64, 52, 108, 166];
+  const sorted = targets.slice().sort((a, b) => Number(a.date ?? a.start ?? 0) - Number(b.date ?? b.start ?? 0));
+  let laneIndex = 0;
+  pushHistory();
+  sorted.forEach((element, index) => {
+    if (index > 0) {
+      const prev = sorted[index - 1];
+      const prevDate = Number(prev.date ?? prev.start ?? 0);
+      const currentDate = Number(element.date ?? element.start ?? 0);
+      if (Math.abs(currentDate - prevDate) < Math.max(1, projectBounds().range * 0.04)) laneIndex += 1;
+    }
+    element.y = lanes[laneIndex % lanes.length];
+  });
+  renderAll();
+  saveStore("Chevauchements réduits");
+}
+
+function updateSelectionUi() {
+  const count = selectionIds().length;
+  const label = $("#selectionCount");
+  if (label) label.textContent = `${count} sélection${count > 1 ? "s" : ""}`;
+}
+
+function toggleAdvancedEditor() {
+  const panel = $("#advancedEditorPanel");
+  const button = $("#advancedToggleBtn");
+  if (!panel || !button) return;
+  const collapsed = panel.classList.toggle("is-collapsed");
+  button.textContent = collapsed ? "Ouvrir éditeur avancé" : "Fermer éditeur avancé";
 }
 
 function applySurprisePalette() {
@@ -991,7 +1334,7 @@ function addMicroStory() {
   };
   keepElementInProject(element);
   project.elements.push(element);
-  state.selectedId = element.id;
+  setSelection([element.id], false);
   renderAll();
   saveStore("Micro-histoire ajoutée");
 }
@@ -1009,7 +1352,7 @@ function addSurpriseEvent() {
   const element = event(idea[0], Math.round(start + Math.random() * (end - start)), idea[1], "★", "#8c3d69", -190);
   keepElementInProject(element);
   project.elements.push(element);
-  state.selectedId = element.id;
+  setSelection([element.id], false);
   renderAll();
   saveStore("Surprise ajoutée");
 }
@@ -1023,10 +1366,7 @@ function fitTimeline(save = true) {
 }
 
 function selectElement(id) {
-  state.selectedId = id;
-  state.formSnapshotOpen = false;
-  renderTimeline();
-  renderProperties();
+  setSelection([id]);
 }
 
 function svgPoint(event) {
@@ -1058,10 +1398,10 @@ function beginPointer(event) {
     event.preventDefault();
     return;
   }
-  state.selectedId = null;
+  clearSelection(false);
+  state.dragging = { mode: "marquee", startPoint: point, currentPoint: point, moved: false };
   renderProperties();
   renderTimeline();
-  state.dragging = { mode: "pan", startPoint: point, center: state.view.center };
   svg.setPointerCapture(event.pointerId);
 }
 
@@ -1073,10 +1413,10 @@ function movePointer(event) {
   const project = currentProject();
   const { width } = getSize();
 
-  if (state.dragging.mode === "pan") {
-    state.view.center = state.dragging.center - dx / state.view.scale;
+  if (state.dragging.mode === "marquee") {
+    state.dragging.currentPoint = point;
+    state.dragging.moved = Math.abs(dx) > 4 || Math.abs(dy) > 4;
     renderTimeline();
-    scheduleSave();
     return;
   }
 
@@ -1118,7 +1458,24 @@ function movePointer(event) {
 
 function endPointer(event) {
   if (!state.dragging) return;
-  if (state.dragging.mode !== "pan" && !state.dragging.moved) {
+  if (state.dragging.mode === "marquee") {
+    const drag = state.dragging;
+    const rect = normalizedRect(drag.startPoint, drag.currentPoint || drag.startPoint);
+    const ids = drag.moved
+      ? [...state.bboxes.entries()].filter(([, box]) => intersectsRect(rect, box)).map(([id]) => id)
+      : [];
+    state.dragging = null;
+    setSelection(ids, false);
+    try {
+      svg.releasePointerCapture(event.pointerId);
+    } catch {
+      /* ignore released pointers */
+    }
+    renderTimeline();
+    renderProperties();
+    return;
+  }
+  if (!state.dragging.moved) {
     state.history.pop();
     updateToolbarState();
   }
@@ -1164,7 +1521,7 @@ function importProjectData(data) {
   };
   state.projects.unshift(imported);
   state.currentId = imported.id;
-  state.selectedId = null;
+  clearSelection(false);
   state.history = [];
   state.future = [];
   fitTimeline(false);
@@ -1277,7 +1634,7 @@ function bindEvents() {
     const project = blankProject();
     state.projects.unshift(project);
     state.currentId = project.id;
-    state.selectedId = null;
+    clearSelection(false);
     state.history = [];
     state.future = [];
     fitTimeline(false);
@@ -1302,6 +1659,16 @@ function bindEvents() {
   $("#colorPartyBtn").addEventListener("click", applySurprisePalette);
   $("#tidyBtn").addEventListener("click", tidyElements);
   $("#microStoryBtn").addEventListener("click", addMicroStory);
+  $("#advancedToggleBtn").addEventListener("click", toggleAdvancedEditor);
+  $("#selectAllBtn").addEventListener("click", selectAllElements);
+  $("#deleteSelectionBtn").addEventListener("click", deleteSelected);
+  $("#duplicateSelectionBtn").addEventListener("click", duplicateSelected);
+  $("#spreadVerticalBtn").addEventListener("click", spreadSelectedVertically);
+  $("#alternateLanesBtn").addEventListener("click", alternateSelectedLanes);
+  $("#compactPdfBtn").addEventListener("click", applyCompactPdfStyle);
+  $("#declutterBtn").addEventListener("click", declutterSelected);
+  $("#invertSelectionBtn").addEventListener("click", invertSelection);
+  $("#bulkColorBtn").addEventListener("click", applyBulkColor);
   $("#exportBinBtn").addEventListener("click", exportBin);
   $("#exportPngBtn").addEventListener("click", exportPng);
   $("#printBtn").addEventListener("click", printPdf);
@@ -1327,28 +1694,38 @@ function bindEvents() {
 
   $("#projectNameInput").addEventListener("input", (event) => {
     const project = currentProject();
-    project.name = event.target.value || "Frise sans titre";
+    project.name = event.target.value;
     renderLists();
+    renderTimeline();
     scheduleSave();
   });
   $("#projectStartInput").addEventListener("change", (event) => {
     const project = currentProject();
     pushHistory();
     project.start = Number(event.target.value);
-    renderTimeline();
+    normalizeProject(project);
+    project.elements.forEach((element) => keepElementInProject(element, project));
+    renderAll();
     saveStore("Bornes modifiées");
   });
   $("#projectEndInput").addEventListener("change", (event) => {
     const project = currentProject();
     pushHistory();
     project.end = Number(event.target.value);
-    renderTimeline();
+    normalizeProject(project);
+    project.elements.forEach((element) => keepElementInProject(element, project));
+    renderAll();
     saveStore("Bornes modifiées");
   });
   $("#printSizeInput").addEventListener("change", (event) => {
     state.printSize = event.target.value;
     saveStore("Format choisi");
   });
+  $("#projectStyleInput").addEventListener("change", (event) => updateProjectSetting("style", event.target.value, "Style changé"));
+  $("#tickStepInput").addEventListener("change", (event) => updateProjectSetting("tickStep", event.target.value, "Graduation changée"));
+  $("#minorTicksInput").addEventListener("change", (event) => updateProjectSetting("minorTicks", Number(event.target.value), "Détails changés"));
+  $("#axisPositionInput").addEventListener("change", (event) => updateProjectSetting("axisPosition", Number(event.target.value), "Axe déplacé"));
+  $("#titleBoxInput").addEventListener("change", (event) => updateProjectSetting("titleBox", event.target.value === "true", "Titre modifié"));
 
   const workspace = $("#workspace");
   workspace.addEventListener("dragover", (event) => {
@@ -1395,6 +1772,10 @@ function handleShortcuts(event) {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "d") {
     event.preventDefault();
     duplicateSelected();
+  }
+  if (!editingText && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
+    event.preventDefault();
+    selectAllElements();
   }
   if (!editingText && (event.key === "Delete" || event.key === "Backspace")) {
     deleteSelected();

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Logo ChronoCréateur</title>
+  <desc id="desc">Un C stylisé entourant une frise chronologique avec des repères.</desc>
+  <defs>
+    <linearGradient id="mark" x1="18" y1="16" x2="110" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1f7a6d"/>
+      <stop offset="0.55" stop-color="#2f8bd9"/>
+      <stop offset="1" stop-color="#c95f32"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#172033" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect x="10" y="10" width="108" height="108" rx="24" fill="#ffffff" filter="url(#shadow)"/>
+  <path d="M82 29c-7-5-16-7-26-5-18 4-31 20-31 40s13 36 31 40c10 2 19 0 26-5" fill="none" stroke="url(#mark)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M42 65h48" fill="none" stroke="#172033" stroke-width="6" stroke-linecap="round"/>
+  <path d="M88 54l13 11-13 11" fill="none" stroke="#172033" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="45" cy="65" r="7" fill="#1f7a6d"/>
+  <circle cx="65" cy="65" r="7" fill="#2f8bd9"/>
+  <circle cx="85" cy="65" r="7" fill="#c95f32"/>
+  <path d="M45 43v14M65 35v22M85 43v14M45 73v14M65 73v22M85 73v14" stroke="#172033" stroke-width="4" stroke-linecap="round" opacity="0.42"/>
+</svg>

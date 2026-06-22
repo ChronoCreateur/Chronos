@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="ChronoCréateur, logiciel web statique de création de frises chronologiques." />
     <title>ChronoCréateur</title>
-    <link rel="stylesheet" href="styles.css?v=20260622-chrono-locked" />
+    <link rel="icon" href="logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css?v=20260622-advanced-v4" />
   </head>
   <body class="landing-mode">
     <section class="landing-page" id="landingPage" aria-label="Accueil ChronoCréateur">
       <div class="landing-nav">
         <div class="brand">
-          <div class="brand-mark" aria-hidden="true">CC</div>
+          <img class="brand-logo" src="logo.svg" alt="" />
           <div>
             <strong>ChronoCréateur</strong>
             <span>Atelier de frises chronologiques</span>
@@ -28,6 +29,10 @@
           <button class="primary-button landing-cta" id="openEditorBtn">Ouvrir l’éditeur</button>
           <button class="text-button landing-secondary" id="openTemplateBtn">Explorer les modèles</button>
         </div>
+        <aside class="tribute-note" aria-label="Hommage">
+          <strong>Hommage à Friseschronos.fr</strong>
+          <p>ChronoCréateur reprend l’esprit de Friseschronos.fr avec gratitude. Son idée a aidé des élèves et enseignants à construire des repères dans le temps ; ce projet veut prolonger cet usage si le site venait à fermer.</p>
+        </aside>
       </div>
 
       <div class="landing-stage" aria-hidden="true">
@@ -49,10 +54,6 @@
               <b>1969</b>
               <strong>Premier pas sur la Lune</strong>
             </div>
-            <div class="landing-event event-three">
-              <b>2022</b>
-              <strong>IA générative</strong>
-            </div>
           </div>
         </div>
       </div>
@@ -60,7 +61,7 @@
 
     <header class="topbar editor-view">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">CC</div>
+        <img class="brand-logo" src="logo.svg" alt="" />
         <div>
           <strong>ChronoCréateur</strong>
           <span>Frises chronologiques interactives</span>
@@ -74,24 +75,24 @@
         <button class="icon-button" id="redoBtn" title="Refaire (Ctrl+Y)" aria-label="Refaire">↷</button>
         <span class="toolbar-divider"></span>
         <button class="icon-button add-icon" data-add="event" title="Ajouter un événement" aria-label="Ajouter un événement">★</button>
-        <button class="icon-button add-icon" data-add="period" title="Ajouter une période" aria-label="Ajouter une période">▰</button>
+        <button class="icon-button add-icon" data-add="period" title="Ajouter une période" aria-label="Ajouter une période">■</button>
         <button class="icon-button add-icon" data-add="text" title="Ajouter un texte" aria-label="Ajouter un texte">T</button>
-        <button class="icon-button add-icon" data-add="image" title="Ajouter une image" aria-label="Ajouter une image">▧</button>
+        <button class="icon-button add-icon" data-add="image" title="Ajouter une image" aria-label="Ajouter une image">□</button>
         <button class="icon-button add-icon" data-add="arrow" title="Ajouter une flèche" aria-label="Ajouter une flèche">→</button>
         <button class="icon-button add-icon" data-add="line" title="Ajouter une ligne" aria-label="Ajouter une ligne">─</button>
-        <button class="icon-button add-icon" data-add="annotation" title="Ajouter une annotation" aria-label="Ajouter une annotation">✎</button>
+        <button class="icon-button add-icon" data-add="annotation" title="Ajouter une annotation" aria-label="Ajouter une annotation">!</button>
         <button class="icon-button add-icon" id="surpriseBtn" title="Ajouter une surprise" aria-label="Ajouter une surprise">?</button>
         <span class="toolbar-divider"></span>
         <button class="icon-button" id="zoomOutBtn" title="Zoom arrière" aria-label="Zoom arrière" hidden>−</button>
         <input id="zoomRange" type="range" min="0.15" max="40" step="0.05" value="1.5" aria-label="Niveau de zoom" hidden />
         <button class="icon-button" id="zoomInBtn" title="Zoom avant" aria-label="Zoom avant" hidden>＋</button>
-        <button class="text-button" id="fitBtn">Ajuster</button>
+        <button class="text-button compact-action" id="fitBtn" title="Ajuster la frise">Ajuster</button>
         <span class="toolbar-divider"></span>
-        <button class="text-button" id="exportPngBtn">PNG</button>
-        <button class="text-button" id="exportBinBtn">Exporter .bin</button>
-        <button class="text-button" id="importBinBtn">Importer .bin</button>
+        <button class="text-button compact-action" id="exportPngBtn" title="Exporter en PNG">PNG</button>
+        <button class="text-button compact-action" id="exportBinBtn" title="Exporter le projet en fichier .bin">.bin</button>
+        <button class="text-button compact-action" id="importBinBtn" title="Importer un projet .bin">Importer</button>
         <input id="binFileInput" type="file" accept=".bin,application/octet-stream" hidden />
-        <button class="text-button" id="printBtn">PDF / Imprimer</button>
+        <button class="text-button compact-action" id="printBtn" title="PDF ou impression">PDF</button>
         <button class="icon-button" id="themeBtn" title="Mode sombre" aria-label="Mode sombre">◐</button>
       </nav>
     </header>
@@ -113,7 +114,7 @@
           <div class="section-title">
             <h2>Frise</h2>
           </div>
-          <label>Nom du projet<input id="projectNameInput" type="text" /></label>
+          <label>Nom du projet<input id="projectNameInput" type="text" placeholder="À compléter par l’utilisateur" /></label>
           <div class="split-fields">
             <label>Début<input id="projectStartInput" type="number" /></label>
             <label>Fin<input id="projectEndInput" type="number" /></label>
@@ -124,6 +125,46 @@
               <option value="a3">A3 paysage</option>
             </select>
           </label>
+          <label>Style de frise
+            <select id="projectStyleInput">
+              <option value="scolaire">Scolaire PDF</option>
+              <option value="moderne">Moderne</option>
+              <option value="minimal">Minimal noir et blanc</option>
+              <option value="nuit">Nuit</option>
+              <option value="couleur">Couleurs vives</option>
+            </select>
+          </label>
+          <div class="split-fields">
+            <label>Graduation
+              <select id="tickStepInput">
+                <option value="auto">Auto</option>
+                <option value="1">1 an</option>
+                <option value="5">5 ans</option>
+                <option value="10">10 ans</option>
+                <option value="25">25 ans</option>
+                <option value="50">50 ans</option>
+                <option value="100">100 ans</option>
+                <option value="500">500 ans</option>
+              </select>
+            </label>
+            <label>Détails
+              <select id="minorTicksInput">
+                <option value="0">Aucun</option>
+                <option value="2">2</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+              </select>
+            </label>
+          </div>
+          <div class="split-fields">
+            <label>Axe vertical (%)<input id="axisPositionInput" type="number" min="25" max="75" /></label>
+            <label>Titre encadré
+              <select id="titleBoxInput">
+                <option value="true">Oui</option>
+                <option value="false">Non</option>
+              </select>
+            </label>
+          </div>
         </section>
 
         <section class="panel-section bonus-section">
@@ -134,6 +175,29 @@
             <button class="text-button" id="colorPartyBtn" type="button">Palette surprise</button>
             <button class="text-button" id="tidyBtn" type="button">Ranger verticalement</button>
             <button class="text-button" id="microStoryBtn" type="button">Micro-histoire drôle</button>
+            <button class="primary-button" id="advancedToggleBtn" type="button">Ouvrir éditeur avancé</button>
+          </div>
+          <div class="advanced-section is-collapsed" id="advancedEditorPanel">
+            <div class="advanced-header">
+              <strong>Éditeur avancé</strong>
+              <span id="selectionCount">0 sélection</span>
+            </div>
+            <div class="advanced-grid">
+              <button class="text-button" id="selectAllBtn" type="button">Tout sélectionner</button>
+              <button class="danger-button" id="deleteSelectionBtn" type="button">Supprimer sélection</button>
+              <button class="text-button" id="duplicateSelectionBtn" type="button">Dupliquer sélection</button>
+              <button class="text-button" id="spreadVerticalBtn" type="button">Répartir verticalement</button>
+              <button class="text-button" id="alternateLanesBtn" type="button">Alterner haut/bas</button>
+              <button class="text-button" id="compactPdfBtn" type="button">Style PDF compact</button>
+              <button class="text-button" id="declutterBtn" type="button">Anti-chevauchement</button>
+              <button class="text-button" id="invertSelectionBtn" type="button">Inverser sélection</button>
+            </div>
+            <label class="bulk-color-row">Couleur groupée
+              <span>
+                <input id="bulkColorInput" type="color" value="#1f7a6d" />
+                <button class="text-button" id="bulkColorBtn" type="button">Appliquer</button>
+              </span>
+            </label>
           </div>
         </section>
 
@@ -185,6 +249,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260622-chrono-locked"></script>
+    <script src="app.js?v=20260622-advanced-v4"></script>
   </body>
 </html>
