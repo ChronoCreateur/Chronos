@@ -49,28 +49,6 @@ const state = {
 
 const templates = [
   {
-    id: "auteurs-francais",
-    name: "Auteur et autrices de français en 4'eme",
-    start: 1500,
-    end: 2026,
-    style: "scolaire",
-    tickStep: "50",
-    minorTicks: 10,
-    titleBox: true,
-    axisPosition: 56,
-    elements: [
-      event("Pierre de Ronsard", 1524, "1524 à 1585", "plume", "#173fbd", -92),
-      event("Louise Labé", 1524, "1524 à 1566", "plume", "#2f8bd9", 34),
-      event("Victor Hugo", 1802, "1802 à 1885", "livre", "#666666", -122),
-      event("Joris-Karl Huysmans", 1848, "1848 à 1907", "livre", "#666666", 72),
-      event("Edmond Rostand", 1868, "1868 à 1918", "theatre", "#666666", 42),
-      event("Guillaume Apollinaire", 1880, "1880 à 1918", "plume", "#666666", -84),
-      event("Jacques Prévert", 1900, "1900 à 1977", "plume", "#ff1b16", -122),
-      event("Raymond Queneau", 1903, "1903 à 1976", "livre", "#ff1b16", -50),
-      event("Grand Corps Malade", 1977, "1977 à 2026", "coeur", "#ff1b16", 36),
-    ].map((item) => ({ ...item, width: 128, height: 44, fontSize: 9, shape: "sharp", fillMode: ["#173fbd", "#2f8bd9", "#ff1b16"].includes(item.color) ? "color" : "white" })),
-  },
-  {
     id: "world",
     name: "Histoire mondiale",
     start: -3200,
@@ -162,6 +140,7 @@ function event(title, date, description, icon, color, y) {
     type: "event",
     title,
     date,
+    endDate: extractEndDate(description, date),
     description,
     icon,
     color,
@@ -192,6 +171,7 @@ function period(title, start, end, color, y, height) {
     fontSize: 14,
     opacity: 0.9,
     align: "center",
+    periodStyle: "band",
   };
 }
 
@@ -285,6 +265,7 @@ function normalizeProject(project) {
 
 function normalizeElement(element) {
   if (element.type === "event") {
+    if (element.endDate === undefined || element.endDate === "") element.endDate = extractEndDate(element.description, element.date);
     element.iconKey = element.iconKey || "plume";
     element.shape = element.shape || "box";
     element.connector = element.connector || "dotted";
@@ -293,6 +274,7 @@ function normalizeElement(element) {
     element.fontSize = Number(element.fontSize || 11);
   }
   if (element.type === "period") {
+    element.periodStyle = element.periodStyle || "band";
     element.height = Number(element.height || 24);
     element.opacity = element.opacity ?? 0.88;
   }
@@ -394,6 +376,9 @@ function keepElementInProject(element, project = currentProject()) {
   if ("date" in element) {
     element.date = Math.round(clamp(Number(element.date), start, end));
   }
+  if ("endDate" in element && element.endDate !== "" && element.endDate !== null && element.endDate !== undefined && Number.isFinite(Number(element.endDate))) {
+    element.endDate = Math.round(clamp(Number(element.endDate), start, end));
+  }
   if ("start" in element && "end" in element) {
     let a = Number(element.start);
     let b = Number(element.end);
@@ -441,6 +426,27 @@ function formatYear(year) {
   if (rounded < 0) return `${Math.abs(rounded).toLocaleString("fr-FR")} av. J.-C.`;
   if (rounded === 0) return "an 0";
   return rounded.toLocaleString("fr-FR");
+}
+
+function extractEndDate(value, startDate) {
+  const matches = String(value || "").match(/-?\d{1,6}/g);
+  if (!matches || matches.length < 2) return "";
+  const end = Number(matches[1]);
+  return Number.isFinite(end) && end !== Number(startDate) ? end : "";
+}
+
+function eventDateLabel(element) {
+  const start = formatYear(element.date);
+  const end = element.endDate !== "" && element.endDate !== null && element.endDate !== undefined && Number.isFinite(Number(element.endDate)) ? formatYear(element.endDate) : "";
+  if (end) return `${start} à ${end}`;
+  const simpleRange = String(element.description || "").match(/^\s*-?\d{1,6}\s*(à|-|–)\s*-?\d{1,6}\s*$/);
+  return simpleRange ? element.description : start;
+}
+
+function truncateText(value, maxWidth, fontSize) {
+  const text = String(value || "");
+  const maxChars = Math.max(3, Math.floor(maxWidth / (fontSize * 0.55)));
+  return text.length > maxChars ? `${text.slice(0, Math.max(1, maxChars - 3))}...` : text;
 }
 
 function chooseTickStep() {
@@ -675,7 +681,7 @@ function renderEmptyState(width, height, axisY, colors) {
 
 function matchesSearch(element) {
   if (!state.search) return true;
-  const haystack = [element.title, element.text, element.description, element.date, element.start, element.end].join(" ").toLowerCase();
+  const haystack = [element.title, element.text, element.description, element.date, element.endDate, element.start, element.end].join(" ").toLowerCase();
   return haystack.includes(state.search.toLowerCase());
 }
 
@@ -687,22 +693,41 @@ function renderPeriod(element, width, axisY, colors) {
   const rectW = Math.max(12, Math.abs(x2 - x1));
   const h = Number(element.height || 32);
   const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.period);
-  createSvg("rect", {
-    x: rectX,
-    y,
-    width: rectW,
-    height: h,
-    rx: 7,
-    fill: element.color,
-    opacity: element.opacity ?? 0.9,
-  }, group);
+  const style = element.periodStyle || "band";
+  const opacity = element.opacity ?? 0.9;
+  if (style === "rail") {
+    const midY = y + h / 2;
+    createSvg("line", { x1: rectX, y1: midY, x2: rectX + rectW, y2: midY, stroke: element.color, "stroke-width": Math.max(4, h * 0.26), "stroke-linecap": "round", opacity }, group);
+    createSvg("circle", { cx: rectX, cy: midY, r: Math.max(5, h * 0.28), fill: colors.bg, stroke: element.color, "stroke-width": 2 }, group);
+    createSvg("circle", { cx: rectX + rectW, cy: midY, r: Math.max(5, h * 0.28), fill: colors.bg, stroke: element.color, "stroke-width": 2 }, group);
+  } else if (style === "bracket") {
+    const midY = y + h / 2;
+    createSvg("line", { x1: rectX, y1: midY, x2: rectX + rectW, y2: midY, stroke: element.color, "stroke-width": 2.2, opacity }, group);
+    createSvg("line", { x1: rectX, y1: y, x2: rectX, y2: y + h, stroke: element.color, "stroke-width": 2.2, opacity }, group);
+    createSvg("line", { x1: rectX + rectW, y1: y, x2: rectX + rectW, y2: y + h, stroke: element.color, "stroke-width": 2.2, opacity }, group);
+  } else {
+    const fill = style === "outline" ? "transparent" : element.color;
+    const stroke = style === "soft" || style === "outline" ? element.color : "none";
+    const rx = style === "capsule" ? h / 2 : 7;
+    createSvg("rect", {
+      x: rectX,
+      y,
+      width: rectW,
+      height: h,
+      rx,
+      fill,
+      stroke,
+      "stroke-width": style === "outline" ? 2.2 : 1.2,
+      opacity: style === "soft" ? Math.min(0.22, opacity) : opacity,
+    }, group);
+  }
   const text = createSvg("text", {
     x: rectX + rectW / 2,
     y: y + h / 2 + Number(element.fontSize || 14) / 3,
     "text-anchor": "middle",
     "font-size": element.fontSize || 14,
     "font-weight": 800,
-    fill: "#ffffff",
+    fill: ["outline", "soft", "rail", "bracket"].includes(style) ? element.color : "#ffffff",
     "pointer-events": "none",
   }, group);
   text.textContent = element.title;
@@ -731,11 +756,55 @@ function drawEventGlyph(parent, cx, cy, color, key = "plume") {
   }, parent);
 }
 
+function eventRadius(shape, height, colors) {
+  if (shape === "sharp") return 0;
+  if (shape === "pill") return height / 2;
+  if (shape === "ticket") return 10;
+  if (shape === "underline") return 0;
+  return colors.radius;
+}
+
+function renderEventShape(parent, element, x, y, width, height, colors) {
+  const shape = element.shape || "box";
+  const fill = element.fillMode === "color" ? element.color : colors.surface;
+  const stroke = element.color;
+  if (shape === "tag") {
+    const notch = Math.min(18, width * 0.16);
+    const path = `M ${x} ${y} H ${x + width - notch} L ${x + width} ${y + height / 2} L ${x + width - notch} ${y + height} H ${x} Z`;
+    createSvg("path", { class: "event-card", d: path, fill, stroke, "stroke-width": 1.4, opacity: element.opacity ?? 1 }, parent);
+    createSvg("circle", { cx: x + width - notch + 2, cy: y + height / 2, r: 3.2, fill: colors.bg, stroke, "stroke-width": 1 }, parent);
+    return;
+  }
+  createSvg("rect", {
+    class: "event-card",
+    x,
+    y,
+    width,
+    height,
+    rx: eventRadius(shape, height, colors),
+    fill: shape === "underline" ? colors.surface : fill,
+    stroke,
+    "stroke-width": shape === "underline" ? 0.8 : 1.4,
+    opacity: element.opacity ?? 1,
+  }, parent);
+  if (shape === "ticket") {
+    const notchR = Math.min(9, height * 0.22);
+    createSvg("circle", { cx: x, cy: y + height / 2, r: notchR, fill: colors.bg, stroke, "stroke-width": 1 }, parent);
+    createSvg("circle", { cx: x + width, cy: y + height / 2, r: notchR, fill: colors.bg, stroke, "stroke-width": 1 }, parent);
+  }
+  if (shape === "underline") {
+    createSvg("line", { x1: x, y1: y + height - 3, x2: x + width, y2: y + height - 3, stroke, "stroke-width": 4, "stroke-linecap": "round", opacity: element.opacity ?? 1 }, parent);
+  }
+}
+
 function renderEvent(element, width, axisY, colors) {
   const x = yearToX(element.date, width);
+  const hasEndDate = element.endDate !== "" && element.endDate !== null && element.endDate !== undefined && Number.isFinite(Number(element.endDate)) && Number(element.endDate) !== Number(element.date);
+  const endX = hasEndDate ? yearToX(element.endDate, width) : null;
   const y = axisY + Number(element.y || -160);
   const w = Number(element.width || 150);
   const h = Number(element.height || 54);
+  const compact = h <= 50 || w <= 135;
   const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.item);
   const top = y;
   let cardX = x - w / 2;
@@ -745,15 +814,36 @@ function renderEvent(element, width, axisY, colors) {
   const connectorY = top + h < axisY ? top + h : top;
   createSvg("line", { x1: x, y1: axisY, x2: x, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": element.connector === "solid" ? "" : colors.dotted, opacity: 0.85 }, group);
   createSvg("circle", { cx: x, cy: axisY, r: 4.8, fill: colors.bg, stroke: element.color, "stroke-width": 2.4 }, group);
-  createSvg("rect", { class: "event-card", x: cardX, y: top, width: w, height: h, rx: element.shape === "sharp" ? 0 : colors.radius, fill: element.fillMode === "color" ? element.color : colors.surface, stroke: element.color, "stroke-width": 1.4, opacity: element.opacity ?? 1 }, group);
-  if (element.fillMode !== "color") createSvg("rect", { x: cardX, y: top, width: 6, height: h, rx: element.shape === "sharp" ? 0 : colors.radius, fill: element.color, opacity: 1 }, group);
+  if (hasEndDate) {
+    createSvg("line", { x1: endX, y1: axisY, x2: endX, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": element.connector === "solid" ? "" : colors.dotted, opacity: 0.85 }, group);
+    createSvg("circle", { cx: endX, cy: axisY, r: 4.8, fill: colors.bg, stroke: element.color, "stroke-width": 2.4 }, group);
+  }
+  renderEventShape(group, element, cardX, top, w, h, colors);
+  if (element.fillMode !== "color" && !["tag", "ticket", "underline"].includes(element.shape)) {
+    const stripeRx = eventRadius(element.shape, h, colors);
+    createSvg("rect", { x: cardX, y: top, width: 6, height: h, rx: stripeRx, fill: element.color, opacity: 1 }, group);
+    createSvg("rect", { x: cardX + w - 6, y: top, width: 6, height: h, rx: stripeRx, fill: element.color, opacity: 1 }, group);
+  }
   const textColor = element.fillMode === "color" ? "#ffffff" : colors.text;
-  drawEventGlyph(group, cardX + 20, top + 22, element.fillMode === "color" ? "#ffffff" : element.color, element.iconKey);
-  const date = createSvg("text", { x: cardX + 38, y: top + 18, "font-size": Math.max(9, Number(element.fontSize || 11) - 1), "font-weight": 800, fill: element.fillMode === "color" ? "#ffffff" : colors.muted }, group);
-  date.textContent = formatYear(element.date);
-  const title = createSvg("text", { x: cardX + 38, y: top + 34, "font-size": element.fontSize || 11, "font-weight": 800, fill: textColor }, group);
-  title.textContent = element.title || "Événement";
-  if (element.description) {
+  const dateColor = element.fillMode === "color" ? "#ffffff" : colors.muted;
+  if (compact) {
+    const pad = element.fillMode === "color" ? 7 : 11;
+    const textWidth = w - pad * 2;
+    const titleSize = Math.max(8, Number(element.fontSize || 10));
+    const dateSize = Math.max(8, titleSize - 1);
+    const title = createSvg("text", { x: cardX + pad, y: top + 15, "font-size": titleSize, "font-weight": 800, fill: textColor }, group);
+    title.textContent = truncateText(element.title || "Événement", textWidth, titleSize);
+    const date = createSvg("text", { x: cardX + pad, y: top + 30, "font-size": dateSize, "font-weight": 800, fill: dateColor }, group);
+    date.textContent = truncateText(eventDateLabel(element), textWidth, dateSize);
+  } else {
+    drawEventGlyph(group, cardX + 20, top + 22, element.fillMode === "color" ? "#ffffff" : element.color, element.iconKey);
+    const textWidth = w - 50;
+    const date = createSvg("text", { x: cardX + 38, y: top + 18, "font-size": Math.max(9, Number(element.fontSize || 11) - 1), "font-weight": 800, fill: dateColor }, group);
+    date.textContent = truncateText(eventDateLabel(element), textWidth, Math.max(9, Number(element.fontSize || 11) - 1));
+    const title = createSvg("text", { x: cardX + 38, y: top + 34, "font-size": element.fontSize || 11, "font-weight": 800, fill: textColor }, group);
+    title.textContent = truncateText(element.title || "Événement", textWidth, Number(element.fontSize || 11));
+  }
+  if (element.description && !compact) {
     drawWrappedText(group, element.description, cardX + 10, top + 49, w - 20, Math.max(9, Number(element.fontSize || 11) - 1), element.fillMode === "color" ? "#ffffff" : colors.muted, 2);
   }
   if (element.image) {
@@ -1009,6 +1099,7 @@ function fieldsFor(element) {
     return [
       { key: "title", label: "Titre", type: "text" },
       { key: "date", label: "Date", type: "number" },
+      { key: "endDate", label: "Date de fin", type: "number" },
       { key: "description", label: "Description", type: "textarea" },
       { key: "image", label: "URL de l'image", type: "url" },
       { key: "iconKey", label: "Icône", type: "select", options: [
@@ -1024,6 +1115,10 @@ function fieldsFor(element) {
       { key: "shape", label: "Forme", type: "select", options: [
         { value: "box", label: "Boîte douce" },
         { value: "sharp", label: "Rectangle PDF" },
+        { value: "pill", label: "Pilule arrondie" },
+        { value: "tag", label: "Étiquette" },
+        { value: "ticket", label: "Ticket" },
+        { value: "underline", label: "Souligné" },
       ] },
       { key: "connector", label: "Connecteur", type: "select", options: [
         { value: "dotted", label: "Pointillé" },
@@ -1045,6 +1140,14 @@ function fieldsFor(element) {
       { key: "title", label: "Texte", type: "text" },
       { key: "start", label: "Début", type: "number" },
       { key: "end", label: "Fin", type: "number" },
+      { key: "periodStyle", label: "Style de période", type: "select", options: [
+        { value: "band", label: "Bande pleine" },
+        { value: "capsule", label: "Capsule" },
+        { value: "outline", label: "Contour" },
+        { value: "soft", label: "Pastel" },
+        { value: "rail", label: "Rail avec bornes" },
+        { value: "bracket", label: "Accolade" },
+      ] },
       ...common,
       ...typography,
       { key: "height", label: "Hauteur", type: "number", min: 16, max: 120 },
@@ -1091,7 +1194,8 @@ function updateElementField(id, field, input) {
     state.formSnapshotOpen = true;
   }
   let value = input.value;
-  if (["number", "range"].includes(field.type)) value = Number(value);
+  if (field.key === "endDate" && value.trim() === "") value = "";
+  else if (["number", "range"].includes(field.type)) value = Number(value);
   element[field.key] = value;
   keepElementInProject(element);
   if (element.type === "period" || element.type === "line" || element.type === "arrow") {
@@ -1316,18 +1420,53 @@ function tidyElements() {
 function addMicroStory() {
   const project = currentProject();
   const { start, end } = projectBounds(project);
-  const date = Math.round(start + (end - start) * 0.72);
+  const stories = [
+    ["Minute importante", "Quelqu'un a enfin renommé le fichier final_vraiment_final."],
+    ["Conseil du conseil", "Après deux heures de débat, la décision est de refaire une réunion."],
+    ["Découverte majeure", "La flèche pointait dans le mauvais sens, mais avec beaucoup d'assurance."],
+    ["Progrès technique", "On invente le bouton Annuler, puis on l'utilise immédiatement."],
+    ["Moment héroïque", "Un élève demande si la date négative veut dire que l'événement n'a pas eu lieu."],
+    ["Crise de précision", "La frise dit 1492 ; quelqu'un demande l'heure exacte."],
+    ["Grande réforme", "Les couleurs sont officiellement classées en joli, très joli et urgence rouge."],
+    ["Événement discret", "Personne n'a compris pourquoi il est là, mais il équilibre bien la page."],
+    ["Révolution du rangement", "Les annotations arrêtent de se marcher dessus. La paix revient."],
+    ["Invention audacieuse", "Une période commence avant son début. Les historiens transpirent."],
+    ["Coup de théâtre", "Le titre était trop long, il devient une période à lui tout seul."],
+    ["Méthode scientifique", "On clique au hasard, puis on appelle ça exploration."],
+    ["Traité de chronologie", "Avant J.-C. et après J.-C. signent enfin un accord de voisinage."],
+    ["Grand doute", "La date est correcte, mais elle a l'air suspecte en Arial."],
+    ["Accident diplomatique", "Deux événements se superposent et refusent de négocier."],
+    ["Décision graphique", "Le bleu est choisi parce que le rouge avait déjà pris beaucoup de place."],
+    ["Archivage glorieux", "Le projet est sauvegardé localement. Un petit fichier respire mieux."],
+    ["Éclair de génie", "On ajoute une ligne pour expliquer la ligne qui expliquait déjà tout."],
+    ["Rigueur absolue", "La frise est précise à l'année près, sauf quand elle préfère être poétique."],
+    ["Incident de zoom", "Tout rentre dans la page. La page demande des vacances."],
+    ["Notation officielle", "Le professeur écrit 'intéressant', ce qui veut dire mystère."],
+    ["Petit miracle", "Le PDF sort du premier coup. Personne n'ose toucher à rien."],
+    ["Chronologie sociale", "L'événement arrive en retard, mais prétend que c'était prévu."],
+    ["Optimisation", "On supprime trois détails, puis on ajoute une annotation pour les regretter."],
+    ["Détail crucial", "Cette micro-histoire ne change rien, mais elle améliore l'ambiance."],
+    ["Plan B", "Si la date ne rentre pas, on agrandit l'Histoire."],
+    ["Contrôle qualité", "Quelqu'un dit 'c'est bon comme ça' et tout le monde sauvegarde vite."],
+    ["Tension dramatique", "La ligne pointillée sait quelque chose que les autres ignorent."],
+    ["Légende locale", "On raconte qu'une frise parfaitement alignée aurait existé un mardi."],
+    ["Fin provisoire", "L'histoire continue, mais le bouton Export PDF attend poliment."],
+  ];
+  const palette = ["#c95f32", "#5762b7", "#1f7a6d", "#8c3d69", "#ad7a34", "#3f78aa"];
+  const lanes = [-205, -138, -72, 82, 148, 208];
+  const story = stories[Math.floor(Math.random() * stories.length)];
+  const date = Math.round(start + Math.random() * (end - start));
   pushHistory();
   const element = {
     id: uid(),
     type: "annotation",
-    title: "Micro-histoire",
-    text: "Moment décisif : quelqu'un a enfin renommé le fichier final_vraiment_final.",
+    title: story[0],
+    text: story[1],
     date,
-    y: 164,
-    width: 270,
-    height: 78,
-    color: "#c95f32",
+    y: lanes[Math.floor(Math.random() * lanes.length)],
+    width: 250 + Math.floor(Math.random() * 70),
+    height: 70 + Math.floor(Math.random() * 24),
+    color: palette[Math.floor(Math.random() * palette.length)],
     fontSize: 14,
     opacity: 0.95,
     align: "start",
