@@ -189,6 +189,78 @@ const templates = [
       event("IA générative", 2022, "Large diffusion des modèles génératifs.", "✦", "#8c3d69", -182),
     ],
   },
+  {
+    id: "life-person",
+    name: "Vie d’une personne",
+    start: 0,
+    end: 90,
+    style: "scolaire",
+    axisStyle: "rounded",
+    tickStep: "10",
+    minorTicks: 5,
+    titleBox: true,
+    axisPosition: 56,
+    elements: [
+      { ...period("Enfance", 0, 12, "#4a8f7a", 58, 28), periodStyle: "soft" },
+      { ...period("Adolescence", 12, 18, "#ad7a34", 94, 28), periodStyle: "soft" },
+      { ...period("Formation", 18, 25, "#5762b7", 130, 28), periodStyle: "soft" },
+      { ...period("Vie adulte", 25, 65, "#c95f32", 166, 28), periodStyle: "soft" },
+      { ...period("Transmission", 65, 90, "#1f7a6d", 202, 28), periodStyle: "soft" },
+      event("Naissance", 0, "Début de la chronologie personnelle.", "coeur", "#c95f32", -190),
+      event("Premier grand souvenir", 6, "Un moment simple qui reste longtemps.", "etoile", "#ad7a34", -132),
+      event("Déclic", 15, "Une passion, une rencontre ou une idée change la suite.", "eclair", "#5762b7", -226),
+      event("Diplôme ou étape clé", 22, "Fin d'un cycle, début d'un autre.", "livre", "#3f78aa", -164),
+      event("Grand projet", 35, "Une décision importante prend forme.", "plume", "#8c3d69", -246),
+      event("Nouvelle direction", 50, "Le parcours se réinvente.", "globe", "#1f7a6d", -112),
+      event("Héritage", 80, "Ce qui reste, se transmet ou inspire.", "coeur", "#c95f32", -202),
+    ],
+  },
+  {
+    id: "war-template",
+    name: "Chronologie d’une guerre",
+    start: 1914,
+    end: 1918,
+    style: "minimal",
+    axisStyle: "double",
+    tickStep: "1",
+    minorTicks: 4,
+    titleBox: true,
+    axisPosition: 57,
+    elements: [
+      { ...period("Entrée en guerre", 1914, 1915, "#8b5f38", 60, 26), periodStyle: "bracket" },
+      { ...period("Guerre d’usure", 1915, 1917, "#6d74b8", 96, 26), periodStyle: "bracket" },
+      { ...period("Sortie du conflit", 1917, 1918, "#c95f32", 132, 26), periodStyle: "bracket" },
+      event("Déclaration", 1914, "Début officiel du conflit.", "eclair", "#c95f32", -184),
+      event("Mobilisation", 1914, "Les sociétés entrent dans l'effort de guerre.", "globe", "#8b5f38", -126),
+      event("Bataille majeure", 1916, "Moment central à documenter avec précision.", "etoile", "#5762b7", -226),
+      event("Tournant", 1917, "Changement militaire, politique ou diplomatique.", "plume", "#1f7a6d", -154),
+      event("Armistice", 1918, "Fin des combats et début des conséquences.", "livre", "#3f78aa", -206),
+      arrow("Progression du conflit", 1914, 1918, "#c95f32", 190),
+    ],
+  },
+  {
+    id: "project-template",
+    name: "Création d’un projet",
+    start: 2026,
+    end: 2030,
+    style: "moderne",
+    axisStyle: "thick",
+    tickStep: "1",
+    minorTicks: 4,
+    titleBox: true,
+    axisPosition: 56,
+    elements: [
+      { ...period("Idée", 2026, 2027, "#4a8f7a", 58, 28), periodStyle: "rail" },
+      { ...period("Prototype", 2027, 2028, "#ad7a34", 96, 28), periodStyle: "rail" },
+      { ...period("Tests", 2028, 2029, "#5762b7", 134, 28), periodStyle: "rail" },
+      { ...period("Lancement", 2029, 2030, "#c95f32", 172, 28), periodStyle: "rail" },
+      event("Brief", 2026, "Objectif, public et contraintes.", "plume", "#1f7a6d", -178),
+      event("Premier prototype", 2027, "Version testable, même imparfaite.", "science", "#ad7a34", -228),
+      event("Retour public", 2028, "On écoute, on trie, on améliore.", "theatre", "#5762b7", -146),
+      event("Version finale", 2029, "La frise du projet devient une feuille de route.", "etoile", "#c95f32", -202),
+      event("Bilan", 2030, "Ce qui a marché, ce qui repart en version 2.", "livre", "#3f78aa", -112),
+    ],
+  },
 ];
 
 function event(title, date, description, icon, color, y) {
@@ -208,7 +280,7 @@ function event(title, date, description, icon, color, y) {
     opacity: 1,
     align: "start",
     image: "",
-    iconKey: ICONS[icon] ? icon : ICON_ALIASES[icon] || "plume",
+    iconKey: icon === "none" ? "none" : ICONS[icon] ? icon : ICON_ALIASES[icon] || "plume",
     shape: "sharp",
     connector: "dotted",
     fillMode: "white",
@@ -332,7 +404,7 @@ function normalizeProject(project) {
 function normalizeElement(element) {
   if (element.type === "event") {
     if (element.endDate === undefined || element.endDate === "") element.endDate = extractEndDate(element.description, element.date);
-    element.iconKey = element.iconKey || "plume";
+    element.iconKey = element.iconKey ?? "plume";
     element.shape = element.shape || "box";
     element.connector = element.connector || "dotted";
     element.rangeMode = element.rangeMode || "span";
@@ -883,6 +955,7 @@ function renderElement(element, width, axisY, colors) {
 }
 
 function drawEventGlyph(parent, cx, cy, color, key = "plume", scale = 0.82, radius = 13) {
+  if (key === "none") return;
   const path = ICONS[key] || ICONS.plume;
   createSvg("circle", { cx, cy, r: radius, fill: color, opacity: 0.14, "pointer-events": "none" }, parent);
   createSvg("path", {
@@ -984,25 +1057,26 @@ function renderEvent(element, width, axisY, colors) {
   }
   const textColor = element.fillMode === "color" ? "#ffffff" : colors.text;
   const dateColor = element.fillMode === "color" ? "#ffffff" : colors.muted;
+  const hasIcon = element.iconKey !== "none";
   if (compact) {
     const pad = element.fillMode === "color" ? 8 : 12;
     const iconColor = element.fillMode === "color" ? "#ffffff" : element.color;
     const iconX = cardX + pad + 8;
-    const textStart = cardX + pad + 23;
+    const textStart = cardX + pad + (hasIcon ? 23 : 0);
     const textEnd = cardX + cardW - pad;
     const textX = alignedTextX(textStart, textEnd, element.align);
     const anchor = svgAnchor(element.align);
     const textWidth = textEnd - textStart;
     const titleSize = Math.max(8, Number(element.fontSize || 10));
     const dateSize = Math.max(8, titleSize - 1);
-    drawEventGlyph(group, iconX, top + Math.min(23, h / 2), iconColor, element.iconKey, 0.48, 8.5);
+    if (hasIcon) drawEventGlyph(group, iconX, top + Math.min(23, h / 2), iconColor, element.iconKey, 0.48, 8.5);
     const title = createSvg("text", { x: textX, y: top + 15, "font-size": titleSize, "font-weight": 800, fill: textColor, "text-anchor": anchor }, group);
     title.textContent = truncateText(element.title || "Événement", textWidth, titleSize);
     const date = createSvg("text", { x: textX, y: top + 30, "font-size": dateSize, "font-weight": 800, fill: dateColor, "text-anchor": anchor }, group);
     date.textContent = truncateText(eventDateLabel(element), textWidth, dateSize);
   } else {
-    drawEventGlyph(group, cardX + 20, top + 22, element.fillMode === "color" ? "#ffffff" : element.color, element.iconKey);
-    const textStart = cardX + 38;
+    if (hasIcon) drawEventGlyph(group, cardX + 20, top + 22, element.fillMode === "color" ? "#ffffff" : element.color, element.iconKey);
+    const textStart = hasIcon ? cardX + 38 : cardX + 12;
     const textEnd = cardX + cardW - 12;
     const textX = alignedTextX(textStart, textEnd, element.align);
     const anchor = svgAnchor(element.align);
@@ -1113,6 +1187,17 @@ function renderSelection(colors) {
   const selected = selectionIds().filter((id) => state.bboxes.has(id));
   selected.forEach((id) => {
     const box = state.bboxes.get(id);
+    const pad = box.kind === "line" ? 18 : 14;
+    createSvg("rect", {
+      class: "selection-hitbox",
+      "data-id": id,
+      x: box.x - pad,
+      y: box.y - pad,
+      width: box.width + pad * 2,
+      height: box.height + pad * 2,
+      rx: box.kind === "line" ? 14 : 12,
+      fill: "transparent",
+    }, layers.selection);
     createSvg("rect", {
       class: "selected-outline",
       x: box.x - 6,
@@ -1282,6 +1367,7 @@ function fieldsFor(element) {
       { key: "description", label: "Description", type: "textarea" },
       { key: "image", label: "URL de l'image", type: "url" },
       { key: "iconKey", label: "Icône", type: "select", options: [
+        { value: "none", label: "Aucune" },
         { value: "plume", label: "Plume" },
         { value: "livre", label: "Livre" },
         { value: "etoile", label: "Étoile" },
@@ -1626,61 +1712,50 @@ function addMicroStory() {
   const project = currentProject();
   const { start, end } = projectBounds(project);
   const stories = [
-    ["Minute importante", "Quelqu'un a enfin renommé le fichier final_vraiment_final."],
-    ["Conseil du conseil", "Après deux heures de débat, la décision est de refaire une réunion."],
-    ["Découverte majeure", "La flèche pointait dans le mauvais sens, mais avec beaucoup d'assurance."],
-    ["Progrès technique", "On invente le bouton Annuler, puis on l'utilise immédiatement."],
-    ["Moment héroïque", "Un élève demande si la date négative veut dire que l'événement n'a pas eu lieu."],
-    ["Crise de précision", "La frise dit 1492 ; quelqu'un demande l'heure exacte."],
-    ["Grande réforme", "Les couleurs sont officiellement classées en joli, très joli et urgence rouge."],
-    ["Événement discret", "Personne n'a compris pourquoi il est là, mais il équilibre bien la page."],
-    ["Révolution du rangement", "Les annotations arrêtent de se marcher dessus. La paix revient."],
-    ["Invention audacieuse", "Une période commence avant son début. Les historiens transpirent."],
-    ["Coup de théâtre", "Le titre était trop long, il devient une période à lui tout seul."],
-    ["Méthode scientifique", "On clique au hasard, puis on appelle ça exploration."],
-    ["Traité de chronologie", "Avant J.-C. et après J.-C. signent enfin un accord de voisinage."],
-    ["Grand doute", "La date est correcte, mais elle a l'air suspecte en Arial."],
-    ["Accident diplomatique", "Deux événements se superposent et refusent de négocier."],
-    ["Décision graphique", "Le bleu est choisi parce que le rouge avait déjà pris beaucoup de place."],
-    ["Archivage glorieux", "Le projet est sauvegardé localement. Un petit fichier respire mieux."],
-    ["Éclair de génie", "On ajoute une ligne pour expliquer la ligne qui expliquait déjà tout."],
-    ["Rigueur absolue", "La frise est précise à l'année près, sauf quand elle préfère être poétique."],
-    ["Incident de zoom", "Tout rentre dans la page. La page demande des vacances."],
-    ["Notation officielle", "Le professeur écrit 'intéressant', ce qui veut dire mystère."],
-    ["Petit miracle", "Le PDF sort du premier coup. Personne n'ose toucher à rien."],
-    ["Chronologie sociale", "L'événement arrive en retard, mais prétend que c'était prévu."],
-    ["Optimisation", "On supprime trois détails, puis on ajoute une annotation pour les regretter."],
-    ["Détail crucial", "Cette micro-histoire ne change rien, mais elle améliore l'ambiance."],
-    ["Plan B", "Si la date ne rentre pas, on agrandit l'Histoire."],
-    ["Contrôle qualité", "Quelqu'un dit 'c'est bon comme ça' et tout le monde sauvegarde vite."],
-    ["Tension dramatique", "La ligne pointillée sait quelque chose que les autres ignorent."],
-    ["Légende locale", "On raconte qu'une frise parfaitement alignée aurait existé un mardi."],
-    ["Fin provisoire", "L'histoire continue, mais le bouton Export PDF attend poliment."],
+    ["Grande réunion inutile", "Tout le monde confirme qu'il faudra refaire une réunion plus courte.", "theatre"],
+    ["Incident de sandales", "Une personne importante arrive trop sûre d'elle pour que ce soit discret.", "etoile"],
+    ["Débat sur la couleur", "La civilisation hésite entre bleu sérieux et rouge beaucoup trop dramatique.", "plume"],
+    ["Carte mal orientée", "On découvre que tourner la carte règle presque tous les problèmes.", "globe"],
+    ["Prototype courageux", "L'invention fonctionne une fois, puis demande une pause.", "science"],
+    ["Erreur de calendrier", "Quelqu'un écrit la bonne date au mauvais siècle avec aplomb.", "livre"],
+    ["Pause héroïque", "Le projet avance grâce à une collation placée au bon moment.", "coeur"],
+    ["Discours trop long", "Le public applaudit surtout parce qu'il a compris que c'était fini.", "theatre"],
+    ["Plan parfaitement vague", "La stratégie tient sur une ligne et beaucoup d'optimisme.", "eclair"],
+    ["Objet retrouvé", "On retrouve enfin l'outil indispensable exactement là où personne n'a cherché.", "etoile"],
+    ["Mode vestimentaire risquée", "Tout le monde prétend que c'était volontaire.", "coeur"],
+    ["Traité du détail", "Une décision minuscule reçoit une importance historique disproportionnée.", "plume"],
+    ["Course contre le retard", "L'événement arrive en retard mais se déclare officiellement prévu.", "eclair"],
+    ["Grand test public", "Le public trouve le défaut en trois secondes. Les experts prennent des notes.", "science"],
+    ["Triomphe administratif", "Un formulaire est rempli correctement du premier coup. La foule reste prudente.", "livre"],
+    ["Carte au trésor confuse", "Le trésor existe peut-être, mais la légende est très motivée.", "globe"],
+    ["Déclaration solennelle", "Tout le monde promet de garder les fichiers bien nommés cette fois.", "plume"],
+    ["Victoire du rangement", "Deux éléments ne se chevauchent plus. La frise respire.", "etoile"],
+    ["Bug diplomatique", "Deux camps accusent la même virgule d'avoir commencé le problème.", "theatre"],
+    ["Grande intuition", "Personne ne sait pourquoi, mais l'idée marche mieux en vert.", "science"],
   ];
   const palette = ["#c95f32", "#5762b7", "#1f7a6d", "#8c3d69", "#ad7a34", "#3f78aa"];
-  const lanes = [-205, -138, -72, 82, 148, 208];
-  const story = stories[Math.floor(Math.random() * stories.length)];
-  const date = Math.round(start + Math.random() * (end - start));
+  const lanes = [-220, -160, -100, 88, 148, 208];
+  const firstYear = Math.ceil(start / 50) * 50;
+  const dates = [];
+  for (let year = firstYear; year <= end; year += 50) dates.push(year);
+  if (!dates.length) dates.push(Math.round((start + end) / 2));
   pushHistory();
-  const element = {
-    id: uid(),
-    type: "annotation",
-    title: story[0],
-    text: story[1],
-    date,
-    y: lanes[Math.floor(Math.random() * lanes.length)],
-    width: 250 + Math.floor(Math.random() * 70),
-    height: 70 + Math.floor(Math.random() * 24),
-    color: palette[Math.floor(Math.random() * palette.length)],
-    fontSize: 14,
-    opacity: 0.95,
-    align: "start",
-  };
-  keepElementInProject(element);
-  project.elements.push(element);
-  setSelection([element.id], false);
+  const created = dates.map((date, index) => {
+    const story = stories[(index + Math.floor(Math.random() * stories.length)) % stories.length];
+    const element = event(story[0], date, story[1], story[2], palette[index % palette.length], lanes[index % lanes.length]);
+    element.width = 172;
+    element.height = 54;
+    element.fontSize = 10;
+    element.shape = ["box", "sharp", "pill", "ticket"][index % 4];
+    element.fillMode = index % 5 === 0 ? "color" : "white";
+    element.align = index % 3 === 0 ? "center" : "start";
+    keepElementInProject(element, project);
+    return element;
+  });
+  project.elements.push(...created);
+  setSelection(created.map((element) => element.id), false);
   renderAll();
-  saveStore("Micro-histoire ajoutée");
+  saveStore(`${created.length} événements drôles ajoutés`);
 }
 
 function addSurpriseEvent() {
@@ -1734,10 +1809,25 @@ function beginPointer(event) {
   }
   if (selectable) {
     const id = selectable.dataset.id;
-    const element = currentProject().elements.find((item) => item.id === id);
-    selectElement(id);
+    const project = currentProject();
+    const selected = selectionIds();
+    const movingIds = selected.includes(id) ? selected : [id];
+    const element = project.elements.find((item) => item.id === id);
+    if (!element) return;
+    if (!selected.includes(id)) selectElement(id);
     pushHistory();
-    state.dragging = { mode: "move", id, startPoint: point, original: clone(element), moved: false };
+    state.dragging = {
+      mode: "move",
+      id,
+      ids: movingIds,
+      startPoint: point,
+      originals: new Map(movingIds.map((itemId) => {
+        const item = project.elements.find((target) => target.id === itemId);
+        return [itemId, clone(item)];
+      })),
+      original: clone(element),
+      moved: false,
+    };
     svg.setPointerCapture(event.pointerId);
     event.preventDefault();
     return;
@@ -1764,23 +1854,33 @@ function movePointer(event) {
     return;
   }
 
-  const element = project.elements.find((item) => item.id === state.dragging.id);
-  if (!element) return;
   state.dragging.moved = true;
-  const original = state.dragging.original;
   const yearDelta = dx / state.view.scale;
 
   if (state.dragging.mode === "move") {
-    if (!isChronologicalElement(element)) {
-      if ("date" in element) element.date = Math.round(Number(original.date) + yearDelta);
-      if ("start" in element) {
-        const duration = Number(original.end) - Number(original.start);
-        element.start = Math.round(Number(original.start) + yearDelta);
-        element.end = Math.round(element.start + duration);
+    state.dragging.ids.forEach((id) => {
+      const element = project.elements.find((item) => item.id === id);
+      const original = state.dragging.originals.get(id);
+      if (!element || !original) return;
+      if (!isChronologicalElement(element)) {
+        if ("date" in element) element.date = Math.round(Number(original.date) + yearDelta);
+        if ("start" in element) {
+          const duration = Number(original.end) - Number(original.start);
+          element.start = Math.round(Number(original.start) + yearDelta);
+          element.end = Math.round(element.start + duration);
+        }
       }
-    }
-    element.y = Math.round(Number(original.y || 0) + dy);
+      element.y = Math.round(Number(original.y || 0) + dy);
+      keepElementInProject(element);
+    });
+    renderTimeline();
+    renderProperties();
+    return;
   }
+
+  const element = project.elements.find((item) => item.id === state.dragging.id);
+  if (!element) return;
+  const original = state.dragging.original;
 
   if (state.dragging.mode === "start") {
     if ("start" in element) element.start = Math.round(xToYear(point.x, width));
