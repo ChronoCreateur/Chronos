@@ -212,6 +212,7 @@ function event(title, date, description, icon, color, y) {
     shape: "sharp",
     connector: "dotted",
     fillMode: "white",
+    rangeMode: "span",
   };
 }
 
@@ -229,6 +230,7 @@ function period(title, start, end, color, y, height) {
     opacity: 0.9,
     align: "center",
     periodStyle: "band",
+    guides: true,
   };
 }
 
@@ -243,6 +245,7 @@ function arrow(title, start, end, color, y) {
     y,
     width: 3,
     opacity: 1,
+    guides: false,
   };
 }
 
@@ -328,14 +331,22 @@ function normalizeElement(element) {
     element.iconKey = element.iconKey || "plume";
     element.shape = element.shape || "box";
     element.connector = element.connector || "dotted";
+    element.rangeMode = element.rangeMode || "span";
     element.width = Number(element.width || 150);
     element.height = Number(element.height || 54);
     element.fontSize = Number(element.fontSize || 11);
   }
   if (element.type === "period") {
     element.periodStyle = element.periodStyle || "band";
+    element.guides = element.guides ?? true;
     element.height = Number(element.height || 24);
     element.opacity = element.opacity ?? 0.88;
+  }
+  if (element.type === "line") {
+    element.guides = element.guides ?? true;
+  }
+  if (element.type === "arrow") {
+    element.guides = element.guides ?? false;
   }
   return element;
 }
@@ -782,6 +793,9 @@ function renderPeriod(element, width, axisY, colors) {
   const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.period);
   const style = element.periodStyle || "band";
   const opacity = element.opacity ?? 0.9;
+  if (element.guides !== false) {
+    drawDateGuides(group, rectX, rectX + rectW, axisY, y, y + h, element.color, colors);
+  }
   if (style === "rail") {
     const midY = y + h / 2;
     createSvg("line", { x1: rectX, y1: midY, x2: rectX + rectW, y2: midY, stroke: element.color, "stroke-width": Math.max(4, h * 0.26), "stroke-linecap": "round", opacity }, group);
@@ -819,6 +833,13 @@ function renderPeriod(element, width, axisY, colors) {
   }, group);
   text.textContent = element.title;
   state.bboxes.set(element.id, { x: rectX, y, width: rectW, height: h, kind: "period" });
+}
+
+function drawDateGuides(parent, x1, x2, axisY, y1, y2, color, colors) {
+  const guideY = y2 < axisY ? y2 : y1;
+  const dash = colors.dotted || "3 3";
+  createSvg("line", { x1, y1: axisY, x2: x1, y2: guideY, stroke: color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.78 }, parent);
+  createSvg("line", { x1: x2, y1: axisY, x2, y2: guideY, stroke: color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.78 }, parent);
 }
 
 function renderElement(element, width, axisY, colors) {
@@ -891,11 +912,21 @@ function renderEvent(element, width, axisY, colors) {
   const y = axisY + Number(element.y || -160);
   const w = Number(element.width || 150);
   const h = Number(element.height || 54);
-  const compact = h <= 50 || w <= 135;
   const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.item);
   const top = y;
-  let cardX = hasEndDate ? (x + endX) / 2 - w / 2 : x - w / 2;
-  cardX = clamp(cardX, 8, Math.max(8, width - w - 8));
+  const rangeMode = element.rangeMode || "span";
+  let cardW = w;
+  let cardX;
+  if (hasEndDate && rangeMode === "span") {
+    const leftDateX = Math.min(x, endX);
+    const rightDateX = Math.max(x, endX);
+    cardX = clamp(leftDateX, 8, width - 98);
+    cardW = clamp(rightDateX - leftDateX, 90, width - cardX - 8);
+  } else {
+    cardX = hasEndDate ? (x + endX) / 2 - w / 2 : x - w / 2;
+    cardX = clamp(cardX, 8, Math.max(8, width - w - 8));
+  }
+  const compact = h <= 50 || cardW <= 135;
   const connectorY = top + h < axisY ? top + h : top;
   const dash = element.connector === "solid" ? "" : colors.dotted;
   createSvg("line", { x1: x, y1: axisY, x2: x, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.85 }, group);
@@ -904,19 +935,19 @@ function renderEvent(element, width, axisY, colors) {
     createSvg("line", { x1: endX, y1: axisY, x2: endX, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.85 }, group);
     const leftDateX = Math.min(x, endX);
     const rightDateX = Math.max(x, endX);
-    if (leftDateX < cardX - 2) {
+    if (rangeMode !== "span" && leftDateX < cardX - 2) {
       createSvg("line", { x1: leftDateX, y1: connectorY, x2: cardX, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.85 }, group);
     }
-    if (rightDateX > cardX + w + 2) {
-      createSvg("line", { x1: cardX + w, y1: connectorY, x2: rightDateX, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.85 }, group);
+    if (rangeMode !== "span" && rightDateX > cardX + cardW + 2) {
+      createSvg("line", { x1: cardX + cardW, y1: connectorY, x2: rightDateX, y2: connectorY, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": dash, opacity: 0.85 }, group);
     }
     createSvg("circle", { cx: endX, cy: axisY, r: 4.8, fill: colors.bg, stroke: element.color, "stroke-width": 2.4 }, group);
   }
-  renderEventShape(group, element, cardX, top, w, h, colors);
+  renderEventShape(group, element, cardX, top, cardW, h, colors);
   if (element.fillMode !== "color" && !["tag", "ticket", "underline"].includes(element.shape)) {
     const stripeRx = eventRadius(element.shape, h, colors);
     createSvg("rect", { x: cardX, y: top, width: 6, height: h, rx: stripeRx, fill: element.color, opacity: 1 }, group);
-    createSvg("rect", { x: cardX + w - 6, y: top, width: 6, height: h, rx: stripeRx, fill: element.color, opacity: 1 }, group);
+    createSvg("rect", { x: cardX + cardW - 6, y: top, width: 6, height: h, rx: stripeRx, fill: element.color, opacity: 1 }, group);
   }
   const textColor = element.fillMode === "color" ? "#ffffff" : colors.text;
   const dateColor = element.fillMode === "color" ? "#ffffff" : colors.muted;
@@ -925,7 +956,7 @@ function renderEvent(element, width, axisY, colors) {
     const iconColor = element.fillMode === "color" ? "#ffffff" : element.color;
     const iconX = cardX + pad + 8;
     const textX = cardX + pad + 23;
-    const textWidth = w - (pad * 2 + 24);
+    const textWidth = cardW - (pad * 2 + 24);
     const titleSize = Math.max(8, Number(element.fontSize || 10));
     const dateSize = Math.max(8, titleSize - 1);
     drawEventGlyph(group, iconX, top + Math.min(23, h / 2), iconColor, element.iconKey, 0.48, 8.5);
@@ -935,7 +966,7 @@ function renderEvent(element, width, axisY, colors) {
     date.textContent = truncateText(eventDateLabel(element), textWidth, dateSize);
   } else {
     drawEventGlyph(group, cardX + 20, top + 22, element.fillMode === "color" ? "#ffffff" : element.color, element.iconKey);
-    const textWidth = w - 50;
+    const textWidth = cardW - 50;
     const date = createSvg("text", { x: cardX + 38, y: top + 18, "font-size": Math.max(9, Number(element.fontSize || 11) - 1), "font-weight": 800, fill: dateColor }, group);
     date.textContent = truncateText(eventDateLabel(element), textWidth, Math.max(9, Number(element.fontSize || 11) - 1));
     const title = createSvg("text", { x: cardX + 38, y: top + 34, "font-size": element.fontSize || 11, "font-weight": 800, fill: textColor }, group);
@@ -945,9 +976,9 @@ function renderEvent(element, width, axisY, colors) {
     drawWrappedText(group, element.description, cardX + 10, top + 49, w - 20, Math.max(9, Number(element.fontSize || 11) - 1), element.fillMode === "color" ? "#ffffff" : colors.muted, 2);
   }
   if (element.image) {
-    createSvg("image", { href: element.image, x: cardX + w - 58, y: top + h - 58, width: 44, height: 44, preserveAspectRatio: "xMidYMid slice", opacity: 0.9 }, group);
+    createSvg("image", { href: element.image, x: cardX + cardW - 58, y: top + h - 58, width: 44, height: 44, preserveAspectRatio: "xMidYMid slice", opacity: 0.9 }, group);
   }
-  state.bboxes.set(element.id, { x: cardX, y: top, width: w, height: h, kind: "box" });
+  state.bboxes.set(element.id, { x: cardX, y: top, width: cardW, height: h, kind: "box" });
 }
 
 function renderTextLike(element, width, axisY, colors) {
@@ -989,6 +1020,9 @@ function renderLine(element, width, axisY, colors) {
   const x2 = yearToX(element.end, width);
   const y = axisY + Number(element.y || 120);
   const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.item);
+  if (element.guides === true || (element.type === "line" && element.guides !== false)) {
+    drawDateGuides(group, x1, x2, axisY, y - 14, y + 14, element.color || colors.text, colors);
+  }
   const line = createSvg("line", {
     x1,
     y1: y,
@@ -1141,7 +1175,7 @@ function renderProperties() {
         opt.textContent = option.label;
         input.appendChild(opt);
       });
-      input.value = element[field.key] || field.options[0].value;
+      input.value = element[field.key] !== undefined && element[field.key] !== null ? String(element[field.key]) : field.options[0].value;
     } else {
       input = document.createElement("input");
       input.type = field.type;
@@ -1198,6 +1232,10 @@ function fieldsFor(element) {
       { key: "title", label: "Titre", type: "text" },
       { key: "date", label: "Date", type: "number" },
       { key: "endDate", label: "Date de fin", type: "number" },
+      { key: "rangeMode", label: "Affichage durée", type: "select", options: [
+        { value: "span", label: "Boîte de début à fin" },
+        { value: "center", label: "Centré avec lignes" },
+      ] },
       { key: "description", label: "Description", type: "textarea" },
       { key: "image", label: "URL de l'image", type: "url" },
       { key: "iconKey", label: "Icône", type: "select", options: [
@@ -1246,6 +1284,10 @@ function fieldsFor(element) {
         { value: "rail", label: "Rail avec bornes" },
         { value: "bracket", label: "Accolade" },
       ] },
+      { key: "guides", label: "Repères pointillés", type: "select", options: [
+        { value: "true", label: "Oui" },
+        { value: "false", label: "Non" },
+      ] },
       ...common,
       ...typography,
       { key: "height", label: "Hauteur", type: "number", min: 16, max: 120 },
@@ -1257,6 +1299,10 @@ function fieldsFor(element) {
       { key: "title", label: "Libellé", type: "text" },
       { key: "start", label: "Début", type: "number" },
       { key: "end", label: "Fin", type: "number" },
+      { key: "guides", label: "Repères pointillés", type: "select", options: [
+        { value: "true", label: "Oui" },
+        { value: "false", label: "Non" },
+      ] },
       ...common,
       { key: "width", label: "Épaisseur", type: "number", min: 1, max: 16 },
       { key: "y", label: "Position verticale", type: "number" },
@@ -1293,6 +1339,7 @@ function updateElementField(id, field, input) {
   }
   let value = input.value;
   if (field.key === "endDate" && value.trim() === "") value = "";
+  else if (field.key === "guides") value = value === "true";
   else if (["number", "range"].includes(field.type)) value = Number(value);
   element[field.key] = value;
   keepElementInProject(element);
@@ -1741,7 +1788,23 @@ function exportBin() {
   const project = currentProject();
   const payload = JSON.stringify({ project, exportedAt: new Date().toISOString() });
   const bytes = new TextEncoder().encode(`${BIN_MAGIC}${payload}`);
-  downloadBlob(`${slug(project.name)}.bin`, new Blob([bytes], { type: "application/octet-stream" }), "application/octet-stream");
+  downloadBlob(`${projectFileName(project)}.bin`, new Blob([bytes], { type: "application/octet-stream" }), "application/octet-stream");
+}
+
+function explainBinExport() {
+  return confirm(
+    "Le fichier .bin est une sauvegarde complète de cette frise : éléments, dates, couleurs, styles et réglages.\n\n" +
+    "Il sert à reprendre le projet plus tard avec le bouton Importer. Ce n'est pas une image et il n'est pas fait pour être ouvert directement.\n\n" +
+    "Continuer l'export .bin ?"
+  );
+}
+
+function explainBinImport() {
+  return confirm(
+    "Importer un .bin va ouvrir une frise sauvegardée avec ChronoCréateur.\n\n" +
+    "Le projet importé sera ajouté à votre liste locale, sans serveur et sans compte. Choisissez seulement un fichier .bin exporté depuis ce site.\n\n" +
+    "Continuer l'import ?"
+  );
 }
 
 function importProjectData(data) {
@@ -1803,19 +1866,28 @@ function exportPng() {
     ctx.drawImage(image, 0, 0);
     URL.revokeObjectURL(url);
     canvas.toBlob((png) => {
-      downloadBlob(`${slug(project.name)}.png`, png, "image/png");
+      downloadBlob(`${projectFileName(project)}.png`, png, "image/png");
     });
   };
   image.src = url;
 }
 
 function printPdf() {
+  const project = currentProject();
   const size = state.printSize === "a3" ? "A3" : "A4";
   const style = document.createElement("style");
+  const originalTitle = document.title;
   style.textContent = `@page { size: ${size} landscape; margin: 10mm; }`;
   document.head.appendChild(style);
-  window.addEventListener("afterprint", () => style.remove(), { once: true });
+  document.title = projectFileName(project);
+  window.addEventListener("afterprint", () => {
+    style.remove();
+    document.title = originalTitle;
+  }, { once: true });
   window.print();
+  setTimeout(() => {
+    if (document.title !== originalTitle) document.title = originalTitle;
+  }, 1500);
 }
 
 function downloadBlob(filename, content, type) {
@@ -1837,6 +1909,10 @@ function slug(value) {
     .replace(/[^a-z0-9]+/gi, "-")
     .replace(/^-|-$/g, "")
     .toLowerCase() || "chronocreateur";
+}
+
+function projectFileName(project = currentProject()) {
+  return slug(project?.name || "chronocreateur");
 }
 
 function escapeHtml(value) {
@@ -1906,7 +1982,9 @@ function bindEvents() {
   $("#declutterBtn").addEventListener("click", declutterSelected);
   $("#invertSelectionBtn").addEventListener("click", invertSelection);
   $("#bulkColorBtn").addEventListener("click", applyBulkColor);
-  $("#exportBinBtn").addEventListener("click", exportBin);
+  $("#exportBinBtn").addEventListener("click", () => {
+    if (explainBinExport()) exportBin();
+  });
   $("#exportPngBtn").addEventListener("click", exportPng);
   $("#printBtn").addEventListener("click", printPdf);
   $("#themeBtn").addEventListener("click", () => {
@@ -1917,6 +1995,7 @@ function bindEvents() {
   });
 
   $("#importBinBtn").addEventListener("click", () => {
+    if (!explainBinImport()) return;
     $("#binFileInput").value = "";
     $("#binFileInput").click();
   });
