@@ -927,13 +927,30 @@ function renderPeriod(element, width, axisY, colors) {
       opacity: style === "soft" ? Math.min(0.22, opacity) : opacity,
     }, group);
   }
+  const fontSize = Number(element.fontSize || 14);
+  if (style === "rail") {
+    const labelW = Math.min(Math.max(54, String(element.title || "").length * fontSize * 0.62 + 22), Math.max(54, rectW - 10));
+    const labelH = Math.min(Math.max(20, fontSize + 10), h + 10);
+    createSvg("rect", {
+      x: rectX + rectW / 2 - labelW / 2,
+      y: y + h / 2 - labelH / 2,
+      width: labelW,
+      height: labelH,
+      rx: Math.min(9, labelH / 2),
+      fill: colors.surface,
+      stroke: element.color,
+      "stroke-width": 1.2,
+      opacity: 0.96,
+      "pointer-events": "none",
+    }, group);
+  }
   const text = createSvg("text", {
     x: rectX + rectW / 2,
-    y: y + h / 2 + Number(element.fontSize || 14) / 3,
+    y: y + h / 2 + fontSize / 3,
     "text-anchor": "middle",
-    "font-size": element.fontSize || 14,
+    "font-size": fontSize,
     "font-weight": 800,
-    fill: ["outline", "soft", "rail", "bracket"].includes(style) ? element.color : "#ffffff",
+    fill: style === "rail" ? colors.text : ["outline", "soft", "bracket"].includes(style) ? element.color : "#ffffff",
     "pointer-events": "none",
   }, group);
   text.textContent = element.title;
@@ -1735,27 +1752,29 @@ function addMicroStory() {
   ];
   const palette = ["#c95f32", "#5762b7", "#1f7a6d", "#8c3d69", "#ad7a34", "#3f78aa"];
   const lanes = [-220, -160, -100, 88, 148, 208];
-  const firstYear = Math.ceil(start / 50) * 50;
-  const dates = [];
-  for (let year = firstYear; year <= end; year += 50) dates.push(year);
-  if (!dates.length) dates.push(Math.round((start + end) / 2));
+  const story = stories[Math.floor(Math.random() * stories.length)];
+  const range = Math.max(0, end - start);
+  const date = range > 0 ? Math.round(start + Math.random() * range) : Math.round((start + end) / 2);
   pushHistory();
-  const created = dates.map((date, index) => {
-    const story = stories[(index + Math.floor(Math.random() * stories.length)) % stories.length];
-    const element = event(story[0], date, story[1], story[2], palette[index % palette.length], lanes[index % lanes.length]);
-    element.width = 172;
-    element.height = 54;
-    element.fontSize = 10;
-    element.shape = ["box", "sharp", "pill", "ticket"][index % 4];
-    element.fillMode = index % 5 === 0 ? "color" : "white";
-    element.align = index % 3 === 0 ? "center" : "start";
-    keepElementInProject(element, project);
-    return element;
-  });
-  project.elements.push(...created);
-  setSelection(created.map((element) => element.id), false);
+  const element = event(
+    story[0],
+    date,
+    story[1],
+    story[2],
+    palette[Math.floor(Math.random() * palette.length)],
+    lanes[Math.floor(Math.random() * lanes.length)]
+  );
+  element.width = 172;
+  element.height = 54;
+  element.fontSize = 10;
+  element.shape = ["box", "sharp", "pill", "ticket"][Math.floor(Math.random() * 4)];
+  element.fillMode = Math.random() > 0.78 ? "color" : "white";
+  element.align = Math.random() > 0.65 ? "center" : "start";
+  keepElementInProject(element, project);
+  project.elements.push(element);
+  setSelection([element.id], false);
   renderAll();
-  saveStore(`${created.length} événements drôles ajoutés`);
+  saveStore("Événement drôle ajouté");
 }
 
 function addSurpriseEvent() {

@@ -201,6 +201,22 @@ button {
   line-height: 1.45;
 }
 
+.tribute-note a,
+.support-card a {
+  color: var(--primary-strong);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.tribute-note a:hover,
+.support-card a:hover {
+  text-decoration: underline;
+}
+
+.support-line {
+  padding-top: 4px;
+}
+
 .landing-window {
   position: absolute;
   inset: 0;
@@ -497,6 +513,17 @@ button {
 .panel-section:last-child {
   border-bottom: 0;
   margin-bottom: 0;
+}
+
+.support-card {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 body.has-selection .frise-section,
