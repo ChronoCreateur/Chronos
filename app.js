@@ -579,12 +579,18 @@ function fitViewToProject(width = getSize().width) {
   $("#zoomRange").value = state.view.scale;
 }
 
-function yearToX(year, width = getSize().width) {
-  return width / 2 + (year - state.view.center) * state.view.scale;
+function isAxisReversed(project = currentProject()) {
+  return project?.axisDirection === "backward";
 }
 
-function xToYear(x, width = getSize().width) {
-  return state.view.center + (x - width / 2) / state.view.scale;
+function yearToX(year, width = getSize().width, project = currentProject()) {
+  const offset = (Number(year) - state.view.center) * state.view.scale;
+  return width / 2 + (isAxisReversed(project) ? -offset : offset);
+}
+
+function xToYear(x, width = getSize().width, project = currentProject()) {
+  const offset = (Number(x) - width / 2) / state.view.scale;
+  return state.view.center + (isAxisReversed(project) ? -offset : offset);
 }
 
 function formatYear(year) {
@@ -815,11 +821,13 @@ function renderTimeline() {
   }
   const step = chooseTickStep();
   const bounds = projectBounds(project);
-  $("#scaleLabel").textContent = `${formatYear(bounds.start)} → ${formatYear(bounds.end)}`;
+  $("#scaleLabel").textContent = isAxisReversed(project) ? `${formatYear(bounds.end)} → ${formatYear(bounds.start)}` : `${formatYear(bounds.start)} → ${formatYear(bounds.end)}`;
   const startYear = Math.ceil(bounds.start / step) * step;
   const endYear = Math.floor(bounds.end / step) * step;
   const startX = yearToX(bounds.start, width);
   const endX = yearToX(bounds.end, width);
+  const axisLeftX = Math.min(startX, endX);
+  const axisRightX = Math.max(startX, endX);
   const minorCount = Math.max(0, Number(project.minorTicks ?? 5));
   const minorStep = minorCount ? step / minorCount : 0;
   const compare = project.compareMode === "compare";
@@ -843,7 +851,7 @@ function renderTimeline() {
       if (Math.abs(year / step - Math.round(year / step)) < 0.0001) continue;
       if (isBoundaryYear(year, bounds)) continue;
       const x = yearToX(year, width);
-      if (x < startX || x > endX) continue;
+      if (x < axisLeftX || x > axisRightX) continue;
       createSvg("line", { x1: x, y1: tickTop, x2: x, y2: tickBottom, stroke: colors.axis, "stroke-width": 0.9, opacity: compare ? 0.28 : 0.75 }, layers.axis);
     }
   }
@@ -851,7 +859,7 @@ function renderTimeline() {
   for (let year = startYear; year <= endYear; year += step) {
     if (isBoundaryYear(year, bounds)) continue;
     const x = yearToX(year, width);
-    if (x < startX || x > endX) continue;
+    if (x < axisLeftX || x > axisRightX) continue;
     createSvg("line", { x1: x, y1: compare ? topAxisY - 9 : axisY - 9, x2: x, y2: compare ? bottomAxisY + 9 : axisY + 9, stroke: colors.axis, "stroke-width": 1.1, opacity: compare ? 0.55 : 1 }, layers.axis);
     const label = createSvg("text", {
       x,
@@ -880,8 +888,8 @@ function renderTimeline() {
   if (compare) {
     renderAxisLine(startX, endX, topAxisY, step, colors, project.axisStyle || "arrow", project.axisDirection || "forward");
     renderAxisLine(startX, endX, bottomAxisY, step, colors, project.axisStyle || "arrow", project.axisDirection || "forward");
-    createSvg("text", { x: startX + 10, y: topAxisY - 16, "font-size": 12, "font-weight": 800, fill: colors.muted }, layers.axis).textContent = "Ligne A";
-    createSvg("text", { x: startX + 10, y: bottomAxisY - 16, "font-size": 12, "font-weight": 800, fill: colors.muted }, layers.axis).textContent = "Ligne B";
+    createSvg("text", { x: axisLeftX + 10, y: topAxisY - 16, "font-size": 12, "font-weight": 800, fill: colors.muted }, layers.axis).textContent = "Ligne A";
+    createSvg("text", { x: axisLeftX + 10, y: bottomAxisY - 16, "font-size": 12, "font-weight": 800, fill: colors.muted }, layers.axis).textContent = "Ligne B";
   } else {
     renderAxisLine(startX, endX, axisY, step, colors, project.axisStyle || "arrow", project.axisDirection || "forward");
   }
@@ -913,6 +921,8 @@ function drawHorizontalAxisHead(x, y, direction, colors) {
 }
 
 function renderAxisLine(startX, endX, axisY, step, colors, style = "arrow", direction = "forward") {
+  const leftX = Math.min(startX, endX);
+  const rightX = Math.max(startX, endX);
   const axisWidth = style === "thick" ? 5 : style === "ruler" ? 3 : 1.8;
   const baseAttrs = {
     stroke: colors.axis,
@@ -921,16 +931,16 @@ function renderAxisLine(startX, endX, axisY, step, colors, style = "arrow", dire
     "stroke-dasharray": style === "dotted" ? "8 8" : "",
   };
   const heads = axisHeadFlags(direction);
-  const x1 = heads.start ? startX + 16 : startX;
-  const x2 = heads.end ? endX - 16 : endX;
-  if (heads.start) drawHorizontalAxisHead(startX, axisY, "start", colors);
-  if (heads.end) drawHorizontalAxisHead(endX, axisY, "end", colors);
+  const x1 = heads.start ? leftX + 16 : leftX;
+  const x2 = heads.end ? rightX - 16 : rightX;
+  if (heads.start) drawHorizontalAxisHead(leftX, axisY, "start", colors);
+  if (heads.end) drawHorizontalAxisHead(rightX, axisY, "end", colors);
   if (style === "double") {
     const doubleHeads = direction === "forward" ? { start: true, end: true } : heads;
-    const doubleX1 = doubleHeads.start ? startX + 16 : startX;
-    const doubleX2 = doubleHeads.end ? endX - 16 : endX;
-    if (doubleHeads.start && !heads.start) drawHorizontalAxisHead(startX, axisY, "start", colors);
-    if (doubleHeads.end && !heads.end) drawHorizontalAxisHead(endX, axisY, "end", colors);
+    const doubleX1 = doubleHeads.start ? leftX + 16 : leftX;
+    const doubleX2 = doubleHeads.end ? rightX - 16 : rightX;
+    if (doubleHeads.start && !heads.start) drawHorizontalAxisHead(leftX, axisY, "start", colors);
+    if (doubleHeads.end && !heads.end) drawHorizontalAxisHead(rightX, axisY, "end", colors);
     createSvg("line", { x1: doubleX1, y1: axisY, x2: doubleX2, y2: axisY, ...baseAttrs }, layers.axis);
     return;
   }
@@ -938,7 +948,7 @@ function renderAxisLine(startX, endX, axisY, step, colors, style = "arrow", dire
     createSvg("line", { x1, y1: axisY, x2, y2: axisY, ...baseAttrs }, layers.axis);
     if (style === "ruler") {
       const rulerStep = Math.max(18, step * state.view.scale / 2);
-      for (let x = startX; x <= endX; x += rulerStep) {
+      for (let x = leftX; x <= rightX; x += rulerStep) {
         createSvg("line", { x1: x, y1: axisY - 13, x2: x, y2: axisY + 13, stroke: colors.axis, "stroke-width": 1.2, opacity: 0.85 }, layers.axis);
       }
     }
@@ -954,8 +964,11 @@ function renderAxisLine(startX, endX, axisY, step, colors, style = "arrow", dire
 }
 
 function verticalYearToY(year, height, project = currentProject()) {
-  const { start, range } = projectBounds(project);
-  return 76 + ((Number(year) - start) / Math.max(1, range)) * (height - 148);
+  const { start, end, range } = projectBounds(project);
+  const progress = isAxisReversed(project)
+    ? (end - Number(year)) / Math.max(1, range)
+    : (Number(year) - start) / Math.max(1, range);
+  return 76 + progress * (height - 148);
 }
 
 function renderVerticalTimeline(project, width, height, colors) {
@@ -968,18 +981,21 @@ function renderVerticalTimeline(project, width, height, colors) {
   const rightAxisX = compare ? clamp(axisX + axisGap, 64, width - 64) : axisX;
   const startY = verticalYearToY(bounds.start, height, project);
   const endY = verticalYearToY(bounds.end, height, project);
+  const axisTopY = Math.min(startY, endY);
+  const axisBottomY = Math.max(startY, endY);
   const startYear = Math.ceil(bounds.start / step) * step;
   const endYear = Math.floor(bounds.end / step) * step;
   const minorCount = Math.max(0, Number(project.minorTicks ?? 5));
   const minorStep = minorCount ? step / minorCount : 0;
-  $("#scaleLabel").textContent = `${formatYear(bounds.start)} → ${formatYear(bounds.end)} · vertical${compare ? " · comparaison" : ""}`;
+  const verticalLabel = isAxisReversed(project) ? `${formatYear(bounds.end)} → ${formatYear(bounds.start)}` : `${formatYear(bounds.start)} → ${formatYear(bounds.end)}`;
+  $("#scaleLabel").textContent = `${verticalLabel} · vertical${compare ? " · comparaison" : ""}`;
 
   renderVerticalTitle(project, width, colors);
   const axisXs = compare ? [leftAxisX, rightAxisX] : [axisX];
   axisXs.forEach((x) => renderVerticalAxisLine(x, startY, endY, step, colors, project.axisStyle || "arrow", project.axisDirection || "forward"));
   if (compare) {
-    createSvg("text", { x: leftAxisX - 12, y: startY - 22, "text-anchor": "end", "font-size": 12, "font-weight": 800, fill: colors.muted }, layers.axis).textContent = "Ligne A";
-    createSvg("text", { x: rightAxisX + 12, y: startY - 22, "font-size": 12, "font-weight": 800, fill: colors.muted }, layers.axis).textContent = "Ligne B";
+    createSvg("text", { x: leftAxisX - 12, y: axisTopY - 22, "text-anchor": "end", "font-size": 12, "font-weight": 800, fill: colors.muted }, layers.axis).textContent = "Ligne A";
+    createSvg("text", { x: rightAxisX + 12, y: axisTopY - 22, "font-size": 12, "font-weight": 800, fill: colors.muted }, layers.axis).textContent = "Ligne B";
   }
 
   if (minorStep > 0) {
@@ -1036,6 +1052,8 @@ function drawVerticalAxisHead(x, y, direction, colors) {
 }
 
 function renderVerticalAxisLine(axisX, startY, endY, step, colors, style = "arrow", direction = "forward") {
+  const topY = Math.min(startY, endY);
+  const bottomY = Math.max(startY, endY);
   const axisWidth = style === "thick" ? 5 : style === "ruler" ? 3 : 1.8;
   const baseAttrs = {
     stroke: colors.axis,
@@ -1044,23 +1062,23 @@ function renderVerticalAxisLine(axisX, startY, endY, step, colors, style = "arro
     "stroke-dasharray": style === "dotted" ? "8 8" : "",
   };
   const heads = axisHeadFlags(direction);
-  const y1 = heads.start ? startY + 16 : startY;
-  const y2 = heads.end ? endY - 16 : endY;
-  if (heads.start) drawVerticalAxisHead(axisX, startY, "start", colors);
-  if (heads.end) drawVerticalAxisHead(axisX, endY, "end", colors);
+  const y1 = heads.start ? topY + 16 : topY;
+  const y2 = heads.end ? bottomY - 16 : bottomY;
+  if (heads.start) drawVerticalAxisHead(axisX, topY, "start", colors);
+  if (heads.end) drawVerticalAxisHead(axisX, bottomY, "end", colors);
   if (style === "double") {
     const doubleHeads = direction === "forward" ? { start: true, end: true } : heads;
-    const doubleY1 = doubleHeads.start ? startY + 16 : startY;
-    const doubleY2 = doubleHeads.end ? endY - 16 : endY;
-    if (doubleHeads.start && !heads.start) drawVerticalAxisHead(axisX, startY, "start", colors);
-    if (doubleHeads.end && !heads.end) drawVerticalAxisHead(axisX, endY, "end", colors);
+    const doubleY1 = doubleHeads.start ? topY + 16 : topY;
+    const doubleY2 = doubleHeads.end ? bottomY - 16 : bottomY;
+    if (doubleHeads.start && !heads.start) drawVerticalAxisHead(axisX, topY, "start", colors);
+    if (doubleHeads.end && !heads.end) drawVerticalAxisHead(axisX, bottomY, "end", colors);
     createSvg("line", { x1: axisX, y1: doubleY1, x2: axisX, y2: doubleY2, ...baseAttrs }, layers.axis);
     return;
   }
   createSvg("line", { x1: axisX, y1, x2: axisX, y2, ...baseAttrs }, layers.axis);
   if (style === "ruler") {
     const rulerStep = Math.max(18, step * state.view.scale / 2);
-    for (let y = startY; y <= endY; y += rulerStep) {
+    for (let y = topY; y <= bottomY; y += rulerStep) {
       createSvg("line", { x1: axisX - 13, y1: y, x2: axisX + 13, y2: y, stroke: colors.axis, "stroke-width": 1.2, opacity: 0.85 }, layers.axis);
     }
   }
@@ -1287,7 +1305,7 @@ function renderPeriod(element, width, axisY, colors) {
   }
   const fontSize = Number(element.fontSize || 14);
   let textWidth = Math.max(10, rectW - 12);
-  if (style === "rail") {
+  if (style === "rail" || style === "bracket") {
     const labelW = Math.min(Math.max(54, String(element.title || "").length * fontSize * 0.62 + 22), Math.max(54, rectW - 10));
     textWidth = Math.max(10, labelW - 18);
     const labelH = Math.min(Math.max(20, fontSize + 10), h + 10);
@@ -1300,7 +1318,6 @@ function renderPeriod(element, width, axisY, colors) {
       fill: colors.surface,
       stroke: element.color,
       "stroke-width": 1.2,
-      opacity: 0.96,
       "pointer-events": "none",
     }, group);
   }
@@ -1986,12 +2003,51 @@ function applyBulkColor() {
   saveStore("Couleur appliquée");
 }
 
+function elementChronologyValue(element) {
+  if (element.type === "period" || element.type === "line" || element.type === "arrow") {
+    return (Number(element.start ?? 0) + Number(element.end ?? element.start ?? 0)) / 2;
+  }
+  const date = Number(element.date ?? 0);
+  if (element.type === "event" && element.endDate !== "" && element.endDate !== null && element.endDate !== undefined && Number.isFinite(Number(element.endDate))) {
+    return (date + Number(element.endDate)) / 2;
+  }
+  return date;
+}
+
+function chronologicalTargets(targets) {
+  const project = currentProject();
+  if (!project) return targets;
+  return targets.slice().sort((a, b) => {
+    const ax = project.orientation === "vertical" ? verticalYearToY(elementChronologyValue(a), getSize().height, project) : yearToX(elementChronologyValue(a), getSize().width, project);
+    const bx = project.orientation === "vertical" ? verticalYearToY(elementChronologyValue(b), getSize().height, project) : yearToX(elementChronologyValue(b), getSize().width, project);
+    return ax - bx;
+  });
+}
+
+function estimatedElementSpan(element, width) {
+  if (element.type === "period" || element.type === "line" || element.type === "arrow") {
+    return Math.max(40, Math.abs(yearToX(element.end, width) - yearToX(element.start, width)));
+  }
+  if (element.type === "event" && element.endDate !== "" && element.endDate !== null && element.endDate !== undefined && Number.isFinite(Number(element.endDate))) {
+    return Math.max(Number(element.width || 150), Math.abs(yearToX(element.endDate, width) - yearToX(element.date, width)));
+  }
+  return Number(element.width || (element.type === "image" ? 180 : element.type === "text" || element.type === "annotation" ? 220 : 150));
+}
+
+function elementVisualBox(element, width = getSize().width) {
+  const center = yearToX(elementChronologyValue(element), width);
+  const span = estimatedElementSpan(element, width) + 24;
+  return { center, left: center - span / 2, right: center + span / 2 };
+}
+
 function spreadSelectedVertically() {
   const targets = selectionTargets(true);
   if (!targets.length) return;
-  const sorted = targets.slice().sort((a, b) => Number(a.date ?? a.start ?? 0) - Number(b.date ?? b.start ?? 0));
-  const top = -210;
-  const bottom = 168;
+  const sorted = chronologicalTargets(targets.filter((element) => element.type !== "line" && element.type !== "arrow"));
+  if (!sorted.length) return;
+  const project = currentProject();
+  const top = project?.compareMode === "compare" ? -92 : -228;
+  const bottom = project?.compareMode === "compare" ? 92 : 206;
   const step = sorted.length > 1 ? (bottom - top) / (sorted.length - 1) : 0;
   pushHistory();
   sorted.forEach((element, index) => {
@@ -2004,14 +2060,14 @@ function spreadSelectedVertically() {
 function alternateSelectedLanes() {
   const targets = selectionTargets(true);
   if (!targets.length) return;
-  const lanes = [-166, 76, -96, 138, -224, 196];
+  const sorted = chronologicalTargets(targets.filter((element) => element.type !== "line" && element.type !== "arrow"));
+  if (!sorted.length) return;
+  const project = currentProject();
+  const lanes = project?.compareMode === "compare" ? [-62, 62, -104, 104] : [-176, 96, -112, 156, -236, 216];
   pushHistory();
-  targets
-    .slice()
-    .sort((a, b) => Number(a.date ?? a.start ?? 0) - Number(b.date ?? b.start ?? 0))
-    .forEach((element, index) => {
-      element.y = lanes[index % lanes.length];
-    });
+  sorted.forEach((element, index) => {
+    element.y = lanes[index % lanes.length];
+  });
   renderAll();
   saveStore("Lignes alternées");
 }
@@ -2045,17 +2101,21 @@ function applyCompactPdfStyle() {
 function declutterSelected() {
   const targets = selectionTargets(true).filter((element) => element.type !== "line" && element.type !== "arrow");
   if (!targets.length) return;
-  const lanes = [-240, -178, -116, -54, 58, 120, 182, 244];
-  const sorted = targets.slice().sort((a, b) => Number(a.date ?? a.start ?? 0) - Number(b.date ?? b.start ?? 0));
-  const lastByLane = lanes.map(() => -Infinity);
-  const gap = Math.max(1, projectBounds().range * 0.035);
+  const project = currentProject();
+  const width = getSize().width;
+  fitViewToProject(width);
+  const lanes = project?.compareMode === "compare" ? [-108, -66, 66, 108] : [-246, -184, -122, -60, 62, 124, 186, 248];
+  const sorted = chronologicalTargets(targets)
+    .map((element) => ({ element, box: elementVisualBox(element, width) }))
+    .sort((a, b) => a.box.left - b.box.left);
+  const lastRightByLane = lanes.map(() => -Infinity);
+  const gap = 20;
   pushHistory();
-  sorted.forEach((element) => {
-    const currentDate = Number(element.date ?? element.start ?? 0);
-    let laneIndex = lastByLane.findIndex((date) => Math.abs(currentDate - date) >= gap);
-    if (laneIndex < 0) laneIndex = lastByLane.indexOf(Math.min(...lastByLane));
-    element.y = lanes[laneIndex % lanes.length];
-    lastByLane[laneIndex] = currentDate;
+  sorted.forEach(({ element, box }) => {
+    let laneIndex = lastRightByLane.findIndex((right) => right + gap <= box.left);
+    if (laneIndex < 0) laneIndex = lastRightByLane.indexOf(Math.min(...lastRightByLane));
+    element.y = lanes[laneIndex];
+    lastRightByLane[laneIndex] = Math.max(lastRightByLane[laneIndex], box.right);
     keepElementInProject(element);
   });
   renderAll();
@@ -2118,14 +2178,11 @@ function applySurprisePalette() {
 
 function tidyElements() {
   const project = currentProject();
-  const lanes = [-220, -150, -80, 56, 122, 188];
+  const lanes = project?.compareMode === "compare" ? [-88, 88, -132, 132] : [-220, -150, -80, 64, 134, 204];
   pushHistory();
-  project.elements
-    .slice()
-    .sort((a, b) => Number(a.date ?? a.start ?? 0) - Number(b.date ?? b.start ?? 0))
-    .forEach((element, index) => {
-      element.y = lanes[index % lanes.length];
-    });
+  chronologicalTargets(project.elements.filter((element) => element.type !== "line" && element.type !== "arrow")).forEach((element, index) => {
+    element.y = lanes[index % lanes.length];
+  });
   renderAll();
   saveStore("Frise rangée");
 }
