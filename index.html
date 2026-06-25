@@ -189,7 +189,10 @@
             </label>
           </div>
           <div class="split-fields">
-            <label>Axe vertical (%)<input id="axisPositionInput" type="number" min="25" max="75" /></label>
+            <label>Position de l’axe (%)<input id="axisPositionInput" type="number" min="25" max="75" /></label>
+            <label>Largeur de frise (%)<input id="timelineWidthInput" type="number" min="45" max="100" step="5" /></label>
+          </div>
+          <div class="split-fields">
             <label>Titre encadré
               <select id="titleBoxInput">
                 <option value="true">Oui</option>
@@ -208,6 +211,14 @@
               <option value="rounded">Trait arrondi</option>
             </select>
           </label>
+          <label>Sens de l’axe
+            <select id="axisDirectionInput">
+              <option value="forward">Ancien → récent</option>
+              <option value="backward">Récent → ancien</option>
+              <option value="both">Double sens</option>
+              <option value="none">Sans flèche</option>
+            </select>
+          </label>
           <div class="split-fields">
             <label>Couleur de fond<input id="backgroundColorInput" type="color" /></label>
             <label>Image de fond<input id="backgroundFileInput" type="file" accept="image/*" /></label>
@@ -217,7 +228,7 @@
 
         <section class="panel-section bonus-section">
           <div class="section-title">
-            <h2>Petits outils</h2>
+            <h2>Outils</h2>
           </div>
           <div class="bonus-actions">
             <button class="text-button" id="colorPartyBtn" type="button">Changer les couleurs</button>
@@ -306,6 +317,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260625-no-funny-overflow-v27"></script>
+    <script src="app.js?v=20260625-empty-vertical-v30"></script>
   </body>
 </html>
