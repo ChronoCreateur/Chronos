@@ -2508,7 +2508,7 @@ function escapeHtml(value) {
 function bindEvents() {
   $("#openEditorBtn").addEventListener("click", () => showEditor());
   $("#openEditorNavBtn").addEventListener("click", () => showEditor());
-  $("#openTemplateBtn").addEventListener("click", () => showEditor());
+  $("#openTemplateBtn").addEventListener("click", () => showEditor({ focusTemplates: true }));
 
   svg.addEventListener("pointerdown", beginPointer);
   svg.addEventListener("pointermove", movePointer);
@@ -2671,12 +2671,25 @@ function bindEvents() {
   document.addEventListener("keydown", handleShortcuts);
 }
 
-function showEditor() {
+function showEditor(options = {}) {
   document.body.classList.remove("landing-mode");
   document.body.classList.add("editor-mode");
   requestAnimationFrame(() => {
     fitTimeline(false);
     renderAll();
+    if (options.focusTemplates) focusTemplateSection();
+  });
+}
+
+function focusTemplateSection() {
+  const section = $(".templates-section");
+  if (!section) return;
+  document.body.classList.remove("has-selection");
+  section.classList.remove("is-highlighted");
+  section.scrollIntoView({ behavior: "smooth", block: "center" });
+  requestAnimationFrame(() => {
+    section.classList.add("is-highlighted");
+    window.setTimeout(() => section.classList.remove("is-highlighted"), 1800);
   });
 }
 

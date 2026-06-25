@@ -533,6 +533,25 @@ body.has-selection .projects-section {
   display: none;
 }
 
+.templates-section.is-highlighted {
+  border-radius: 10px;
+  outline: 2px solid color-mix(in srgb, var(--primary) 68%, transparent);
+  outline-offset: 4px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  animation: templateFocusPulse 0.9s ease-in-out 2;
+}
+
+@keyframes templateFocusPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+}
+
 .section-title {
   display: flex;
   align-items: center;
