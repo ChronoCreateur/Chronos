@@ -380,6 +380,12 @@ function blankProject() {
     titleBox: false,
     axisPosition: 56,
     axisStyle: "arrow",
+    orientation: "horizontal",
+    compareMode: "single",
+    legendMode: "manual",
+    legendText: "",
+    legendX: null,
+    legendY: null,
     backgroundColor: "",
     backgroundImage: "",
     createdAt: new Date().toISOString(),
@@ -395,6 +401,13 @@ function normalizeProject(project) {
   project.titleBox = project.titleBox ?? true;
   project.axisPosition = Number(project.axisPosition ?? 56);
   project.axisStyle = project.axisStyle || "arrow";
+  project.orientation = project.orientation || "horizontal";
+  project.compareMode = project.compareMode || "single";
+  project.legendMode = project.legendMode || (project.showLegend === false ? "hidden" : "manual");
+  if (!["manual", "auto", "hidden"].includes(project.legendMode)) project.legendMode = "manual";
+  project.legendText = project.legendText || "";
+  project.legendX = project.legendX === null || project.legendX === undefined || project.legendX === "" ? null : Number(project.legendX);
+  project.legendY = project.legendY === null || project.legendY === undefined || project.legendY === "" ? null : Number(project.legendY);
   project.backgroundColor = project.backgroundColor || "";
   project.backgroundImage = project.backgroundImage || "";
   project.elements = (project.elements || []).map(normalizeElement);
@@ -402,6 +415,7 @@ function normalizeProject(project) {
 }
 
 function normalizeElement(element) {
+  if ("date" in element || "start" in element) element.track = element.track || "top";
   if (element.type === "event") {
     if (element.endDate === undefined || element.endDate === "") element.endDate = extractEndDate(element.description, element.date);
     element.iconKey = element.iconKey ?? "plume";
@@ -710,6 +724,11 @@ function renderProjectFields() {
   const endInput = $("#projectEndInput");
   const printInput = $("#printSizeInput");
   const styleInput = $("#projectStyleInput");
+  const orientationInput = $("#orientationInput");
+  const compareInput = $("#compareModeInput");
+  const legendInput = $("#legendInput");
+  const legendTextInput = $("#legendTextInput");
+  const legendManualControls = $("#legendManualControls");
   const tickInput = $("#tickStepInput");
   const minorInput = $("#minorTicksInput");
   const axisInput = $("#axisPositionInput");
@@ -722,6 +741,11 @@ function renderProjectFields() {
   if (endInput) endInput.value = project.end;
   if (printInput) printInput.value = state.printSize;
   if (styleInput) styleInput.value = project.style || "scolaire";
+  if (orientationInput) orientationInput.value = project.orientation || "horizontal";
+  if (compareInput) compareInput.value = project.compareMode || "single";
+  if (legendInput) legendInput.value = project.legendMode || "manual";
+  if (legendTextInput) legendTextInput.value = project.legendText || "";
+  if (legendManualControls) legendManualControls.hidden = project.legendMode !== "manual";
   if (tickInput) tickInput.value = String(project.tickStep || "auto");
   if (minorInput) minorInput.value = String(project.minorTicks ?? 5);
   if (axisInput) axisInput.value = Number(project.axisPosition ?? 56);
@@ -771,6 +795,10 @@ function renderTimeline() {
     }, layers.grid);
     createSvg("rect", { x: 0, y: 0, width, height, fill: colors.bg, opacity: 0.18 }, layers.grid);
   }
+  if (project.orientation === "vertical") {
+    renderVerticalTimeline(project, width, height, colors);
+    return;
+  }
   const step = chooseTickStep();
   const bounds = projectBounds(project);
   $("#scaleLabel").textContent = `${formatYear(bounds.start)} → ${formatYear(bounds.end)}`;
@@ -780,6 +808,11 @@ function renderTimeline() {
   const endX = yearToX(bounds.end, width);
   const minorCount = Math.max(0, Number(project.minorTicks ?? 5));
   const minorStep = minorCount ? step / minorCount : 0;
+  const compare = project.compareMode === "compare";
+  const topAxisY = compare ? axisY - 70 : axisY;
+  const bottomAxisY = compare ? axisY + 70 : axisY;
+  const tickTop = compare ? topAxisY - 5 : axisY - 5;
+  const tickBottom = compare ? bottomAxisY + 5 : axisY + 5;
 
   const projectTitle = String(project.name || "").trim();
   if (project.titleBox !== false && projectTitle) {
@@ -796,17 +829,17 @@ function renderTimeline() {
       if (Math.abs(year / step - Math.round(year / step)) < 0.0001) continue;
       const x = yearToX(year, width);
       if (x < startX || x > endX) continue;
-      createSvg("line", { x1: x, y1: axisY - 5, x2: x, y2: axisY + 5, stroke: colors.axis, "stroke-width": 0.9, opacity: 0.75 }, layers.axis);
+      createSvg("line", { x1: x, y1: tickTop, x2: x, y2: tickBottom, stroke: colors.axis, "stroke-width": 0.9, opacity: compare ? 0.28 : 0.75 }, layers.axis);
     }
   }
 
   for (let year = startYear; year <= endYear; year += step) {
     const x = yearToX(year, width);
     if (x < startX || x > endX) continue;
-    createSvg("line", { x1: x, y1: axisY - 9, x2: x, y2: axisY + 9, stroke: colors.axis, "stroke-width": 1.1 }, layers.axis);
+    createSvg("line", { x1: x, y1: compare ? topAxisY - 9 : axisY - 9, x2: x, y2: compare ? bottomAxisY + 9 : axisY + 9, stroke: colors.axis, "stroke-width": 1.1, opacity: compare ? 0.55 : 1 }, layers.axis);
     const label = createSvg("text", {
       x,
-      y: axisY + 30,
+      y: compare ? bottomAxisY + 30 : axisY + 30,
       "text-anchor": "middle",
       "font-size": 11,
       fill: colors.muted,
@@ -816,10 +849,10 @@ function renderTimeline() {
 
   [bounds.start, bounds.end].forEach((year) => {
     const x = yearToX(year, width);
-    createSvg("line", { x1: x, y1: axisY - 18, x2: x, y2: axisY + 18, stroke: colors.axis, "stroke-width": 1.3 }, layers.axis);
+    createSvg("line", { x1: x, y1: compare ? topAxisY - 18 : axisY - 18, x2: x, y2: compare ? bottomAxisY + 18 : axisY + 18, stroke: colors.axis, "stroke-width": 1.3 }, layers.axis);
     const label = createSvg("text", {
       x: clamp(x, 44, width - 44),
-      y: axisY + 52,
+      y: compare ? bottomAxisY + 52 : axisY + 52,
       "text-anchor": "middle",
       "font-size": 12,
       "font-weight": 800,
@@ -828,13 +861,25 @@ function renderTimeline() {
     label.textContent = formatYear(year);
   });
 
-  renderAxisLine(startX, endX, axisY, step, colors, project.axisStyle || "arrow");
+  if (compare) {
+    renderAxisLine(startX, endX, topAxisY, step, colors, project.axisStyle || "arrow");
+    renderAxisLine(startX, endX, bottomAxisY, step, colors, project.axisStyle || "arrow");
+    createSvg("text", { x: startX + 10, y: topAxisY - 16, "font-size": 12, "font-weight": 800, fill: colors.muted }, layers.axis).textContent = "Ligne A";
+    createSvg("text", { x: startX + 10, y: bottomAxisY - 16, "font-size": 12, "font-weight": 800, fill: colors.muted }, layers.axis).textContent = "Ligne B";
+  } else {
+    renderAxisLine(startX, endX, axisY, step, colors, project.axisStyle || "arrow");
+  }
 
   const visibleElements = project.elements.filter((element) => matchesSearch(element));
-  visibleElements.filter((element) => element.type === "period").forEach((element) => renderPeriod(element, width, axisY, colors));
-  visibleElements.filter((element) => element.type !== "period").forEach((element) => renderElement(element, width, axisY, colors));
+  visibleElements.filter((element) => element.type === "period").forEach((element) => renderPeriod(element, width, elementAxisY(element, topAxisY, bottomAxisY), colors));
+  visibleElements.filter((element) => element.type !== "period").forEach((element) => renderElement(element, width, elementAxisY(element, topAxisY, bottomAxisY), colors));
   if (!project.elements.length) renderEmptyState(width, height, axisY, colors);
+  if (project.legendMode !== "hidden") renderLegend(project, width, height, colors);
   renderSelection(colors);
+}
+
+function elementAxisY(element, topAxisY, bottomAxisY) {
+  return currentProject()?.compareMode === "compare" && element.track === "bottom" ? bottomAxisY : topAxisY;
 }
 
 function renderAxisLine(startX, endX, axisY, step, colors, style = "arrow") {
@@ -869,6 +914,195 @@ function renderAxisLine(startX, endX, axisY, step, colors, style = "arrow") {
     ...baseAttrs,
   }, layers.axis);
   createSvg("path", { d: `M ${endX - 16} ${axisY - 15} L ${endX} ${axisY} L ${endX - 16} ${axisY + 15}`, fill: "none", stroke: colors.axis, "stroke-width": 1.8, "stroke-linejoin": "round" }, layers.axis);
+}
+
+function verticalYearToY(year, height, project = currentProject()) {
+  const { start, range } = projectBounds(project);
+  return 76 + ((Number(year) - start) / Math.max(1, range)) * (height - 148);
+}
+
+function renderVerticalTimeline(project, width, height, colors) {
+  const bounds = projectBounds(project);
+  const step = chooseTickStep();
+  const axisX = Math.round(width * clamp(Number(project.axisPosition ?? 50), 22, 78) / 100);
+  const startY = verticalYearToY(bounds.start, height, project);
+  const endY = verticalYearToY(bounds.end, height, project);
+  const startYear = Math.ceil(bounds.start / step) * step;
+  const endYear = Math.floor(bounds.end / step) * step;
+  $("#scaleLabel").textContent = `${formatYear(bounds.start)} → ${formatYear(bounds.end)} · vertical`;
+
+  renderVerticalTitle(project, width, colors);
+  createSvg("line", { x1: axisX, y1: startY, x2: axisX, y2: endY - 18, stroke: colors.axis, "stroke-width": project.axisStyle === "thick" ? 5 : 2, "stroke-linecap": "round", "stroke-dasharray": project.axisStyle === "dotted" ? "8 8" : "" }, layers.axis);
+  createSvg("path", { d: `M ${axisX - 14} ${endY - 18} L ${axisX} ${endY} L ${axisX + 14} ${endY - 18}`, fill: "none", stroke: colors.axis, "stroke-width": 2, "stroke-linejoin": "round" }, layers.axis);
+
+  for (let year = startYear; year <= endYear; year += step) {
+    const y = verticalYearToY(year, height, project);
+    createSvg("line", { x1: axisX - 9, y1: y, x2: axisX + 9, y2: y, stroke: colors.axis, "stroke-width": 1.1 }, layers.axis);
+    const label = createSvg("text", { x: axisX - 18, y: y + 4, "text-anchor": "end", "font-size": 11, fill: colors.muted }, layers.axis);
+    label.textContent = formatYear(year);
+  }
+
+  [bounds.start, bounds.end].forEach((year) => {
+    const y = verticalYearToY(year, height, project);
+    createSvg("line", { x1: axisX - 16, y1: y, x2: axisX + 16, y2: y, stroke: colors.axis, "stroke-width": 1.3 }, layers.axis);
+    createSvg("text", { x: axisX + 22, y: y + 4, "font-size": 12, "font-weight": 800, fill: colors.axis }, layers.axis).textContent = formatYear(year);
+  });
+
+  const visibleElements = project.elements.filter((element) => matchesSearch(element));
+  visibleElements.filter((element) => element.type === "period").forEach((element) => renderVerticalPeriod(element, axisX, height, colors, project));
+  visibleElements.filter((element) => element.type !== "period").forEach((element) => renderVerticalElement(element, axisX, height, colors, project));
+  if (!project.elements.length) renderEmptyState(width, height, height / 2, colors);
+  if (project.legendMode !== "hidden") renderLegend(project, width, height, colors);
+  renderSelection(colors);
+}
+
+function renderVerticalTitle(project, width, colors) {
+  const projectTitle = String(project.name || "").trim();
+  if (project.titleBox === false || !projectTitle) return;
+  const titleW = Math.min(520, Math.max(260, projectTitle.length * 9 + 32));
+  const titleX = Math.max(28, Math.min(width - titleW - 28, 36));
+  createSvg("rect", { x: titleX, y: 28, width: titleW, height: 30, fill: colors.bg, stroke: colors.axis, "stroke-width": 1.2, rx: colors.radius }, layers.axis);
+  createSvg("text", { x: titleX + 10, y: 49, "font-size": 16, "font-weight": 800, fill: colors.text }, layers.axis).textContent = projectTitle;
+}
+
+function renderVerticalPeriod(element, axisX, height, colors, project) {
+  const y1 = verticalYearToY(element.start, height, project);
+  const y2 = verticalYearToY(element.end, height, project);
+  const y = Math.min(y1, y2);
+  const h = Math.max(18, Math.abs(y2 - y1));
+  const w = Number(element.height || 30);
+  const x = axisX + Number(element.y || 70) - w / 2;
+  const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.period);
+  createSvg("line", { x1: axisX, y1, x2: x + w / 2, y2: y1, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": colors.dotted, opacity: 0.75 }, group);
+  createSvg("line", { x1: axisX, y1: y2, x2: x + w / 2, y2, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": colors.dotted, opacity: 0.75 }, group);
+  createSvg("rect", { x, y, width: w, height: h, rx: element.periodStyle === "capsule" ? w / 2 : 7, fill: element.periodStyle === "outline" ? "transparent" : element.color, stroke: element.color, opacity: element.periodStyle === "soft" ? 0.22 : element.opacity ?? 0.9 }, group);
+  const text = createSvg("text", { x: x + w + 8, y: y + h / 2 + 4, "font-size": element.fontSize || 13, "font-weight": 800, fill: element.periodStyle === "band" || element.periodStyle === "capsule" ? colors.text : element.color }, group);
+  text.textContent = element.title || "Période";
+  state.bboxes.set(element.id, { x, y, width: Math.max(w, w + 120), height: h, kind: "period" });
+}
+
+function renderVerticalElement(element, axisX, height, colors, project) {
+  if (element.type === "line" || element.type === "arrow") return renderVerticalLine(element, axisX, height, colors, project);
+  const date = Number(element.date ?? projectBounds(project).start);
+  const y = verticalYearToY(date, height, project);
+  const x = axisX + Number(element.y || -180);
+  if (element.type === "image") return renderVerticalImage(element, x, y, colors);
+  if (element.type === "text" || element.type === "annotation") return renderVerticalText(element, x, y, colors);
+  return renderVerticalEvent(element, axisX, x, y, colors);
+}
+
+function renderVerticalEvent(element, axisX, x, y, colors) {
+  const w = Number(element.width || 150);
+  const h = Number(element.height || 54);
+  const cardX = clamp(x, 8, getSize().width - w - 8);
+  const cardY = y - h / 2;
+  const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.item);
+  createSvg("line", { x1: axisX, y1: y, x2: cardX + (cardX > axisX ? 0 : w), y2: y, stroke: element.color, "stroke-width": 1.1, "stroke-dasharray": element.connector === "solid" ? "" : colors.dotted, opacity: 0.85 }, group);
+  createSvg("circle", { cx: axisX, cy: y, r: 4.8, fill: colors.bg, stroke: element.color, "stroke-width": 2.4 }, group);
+  renderEventShape(group, element, cardX, cardY, w, h, colors);
+  const hasIcon = element.iconKey !== "none";
+  if (hasIcon) drawEventGlyph(group, cardX + 20, cardY + 22, element.fillMode === "color" ? "#ffffff" : element.color, element.iconKey);
+  const textStart = hasIcon ? cardX + 38 : cardX + 12;
+  const textEnd = cardX + w - 12;
+  const dateColor = element.fillMode === "color" ? "#ffffff" : colors.muted;
+  const textColor = element.fillMode === "color" ? "#ffffff" : colors.text;
+  createSvg("text", { x: textStart, y: cardY + 18, "font-size": Math.max(9, Number(element.fontSize || 11) - 1), "font-weight": 800, fill: dateColor }, group).textContent = truncateText(eventDateLabel(element), textEnd - textStart, 10);
+  createSvg("text", { x: textStart, y: cardY + 34, "font-size": element.fontSize || 11, "font-weight": 800, fill: textColor }, group).textContent = truncateText(element.title || "Événement", textEnd - textStart, Number(element.fontSize || 11));
+  state.bboxes.set(element.id, { x: cardX, y: cardY, width: w, height: h, kind: "box" });
+}
+
+function renderVerticalText(element, x, y, colors) {
+  const w = Number(element.width || 220);
+  const h = Number(element.height || 76);
+  const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.item);
+  createSvg("rect", { class: `${element.type}-card`, x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 8, fill: element.type === "annotation" ? colors.surface : "transparent", stroke: element.type === "annotation" ? colors.line : "transparent", opacity: element.opacity ?? 1 }, group);
+  drawWrappedText(group, element.text || element.title || "Texte libre", x - w / 2 + 14, y - h / 2 + 24, w - 28, Number(element.fontSize || 16), element.color || colors.text, 4, "start");
+  state.bboxes.set(element.id, { x: x - w / 2, y: y - h / 2, width: w, height: h, kind: "box" });
+}
+
+function renderVerticalImage(element, x, y, colors) {
+  const w = Number(element.width || 180);
+  const h = Number(element.height || 120);
+  const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.item);
+  createSvg("rect", { class: "image-card", x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 8, fill: colors.surface, stroke: colors.line }, group);
+  if (element.image) createSvg("image", { href: element.image, x: x - w / 2 + 6, y: y - h / 2 + 6, width: w - 12, height: h - 12, preserveAspectRatio: "xMidYMid slice", opacity: element.opacity ?? 1 }, group);
+  state.bboxes.set(element.id, { x: x - w / 2, y: y - h / 2, width: w, height: h, kind: "box" });
+}
+
+function renderVerticalLine(element, axisX, height, colors, project) {
+  const y1 = verticalYearToY(element.start, height, project);
+  const y2 = verticalYearToY(element.end, height, project);
+  const x = axisX + Number(element.y || 120);
+  const group = createSvg("g", { class: "selectable", "data-id": element.id }, layers.item);
+  const line = createSvg("line", { x1: x, y1, x2: x, y2, stroke: element.color || colors.text, "stroke-width": element.width || 3, "stroke-linecap": "round", opacity: element.opacity ?? 1 }, group);
+  if (element.type === "arrow") line.setAttribute("marker-end", "url(#arrowHead)");
+  if (element.title) createSvg("text", { x: x + 10, y: (y1 + y2) / 2, "font-size": 13, "font-weight": 800, fill: element.color || colors.text }, group).textContent = element.title;
+  state.bboxes.set(element.id, { x: x - 14, y: Math.min(y1, y2), width: 28, height: Math.abs(y2 - y1), kind: "line" });
+}
+
+function renderLegend(project, width, height, colors) {
+  const entries = project.legendMode === "auto" ? automaticLegendEntries(project) : manualLegendEntries(project);
+  if (!entries.length) return;
+  const rows = entries.slice(0, 7);
+  const boxW = 210;
+  const boxH = 30 + rows.length * 22;
+  const x = clamp(Number(project.legendX ?? width - boxW - 24), 10, Math.max(10, width - boxW - 10));
+  const y = clamp(Number(project.legendY ?? height - boxH - 24), 10, Math.max(10, height - boxH - 10));
+  project.legendX = x;
+  project.legendY = y;
+  const group = createSvg("g", { class: "legend-box", "data-legend": "true" }, layers.axis);
+  createSvg("rect", { x: x - 8, y: y - 8, width: boxW + 16, height: boxH + 16, rx: 12, fill: "transparent", "data-legend": "true" }, group);
+  createSvg("rect", { x, y, width: boxW, height: boxH, rx: 8, fill: colors.surface, stroke: colors.line, opacity: 0.96, "pointer-events": "none" }, group);
+  createSvg("text", { x: x + 12, y: y + 20, "font-size": 12, "font-weight": 900, fill: colors.text }, group).textContent = "Légende";
+  rows.forEach((entry, index) => {
+    const rowY = y + 42 + index * 22;
+    createSvg("rect", { x: x + 12, y: rowY - 11, width: 16, height: 10, rx: 3, fill: entry.color }, group);
+    createSvg("text", { x: x + 36, y: rowY - 2, "font-size": 11, fill: colors.muted }, group).textContent = truncateText(entry.label, 150, 11);
+  });
+}
+
+function manualLegendEntries(project) {
+  return String(project.legendText || "")
+    .split(/\n+/)
+    .map((line, index) => {
+      const parts = line.split("=");
+      const label = (parts[0] || "").trim();
+      const color = (parts[1] || "").trim();
+      if (!label) return null;
+      return { label, color: /^#[0-9a-f]{6}$/i.test(color) ? color : ["#c95f32", "#5762b7", "#1f7a6d", "#ad7a34", "#8c3d69"][index % 5] };
+    })
+    .filter(Boolean);
+}
+
+function automaticLegendEntries(project) {
+  const entries = [];
+  const seen = new Set();
+  project.elements.forEach((element) => {
+    if (!element.color || seen.has(element.color)) return;
+    seen.add(element.color);
+    entries.push({ color: element.color, label: element.title || (element.type === "period" ? "Période" : "Événement") });
+  });
+  return entries;
+}
+
+function fillManualLegendFromFrise() {
+  const project = currentProject();
+  if (!project) return;
+  const entries = automaticLegendEntries(project);
+  pushHistory();
+  project.legendMode = "manual";
+  project.legendText = entries.map((entry) => `${entry.label} = ${entry.color}`).join("\n");
+  renderAll();
+  saveStore("Légende remplie");
+}
+
+function clearManualLegend() {
+  const project = currentProject();
+  if (!project) return;
+  pushHistory();
+  project.legendText = "";
+  renderAll();
+  saveStore("Légende vidée");
 }
 
 function renderEmptyState(width, height, axisY, colors) {
@@ -928,8 +1162,10 @@ function renderPeriod(element, width, axisY, colors) {
     }, group);
   }
   const fontSize = Number(element.fontSize || 14);
+  let textWidth = Math.max(10, rectW - 12);
   if (style === "rail") {
     const labelW = Math.min(Math.max(54, String(element.title || "").length * fontSize * 0.62 + 22), Math.max(54, rectW - 10));
+    textWidth = Math.max(10, labelW - 18);
     const labelH = Math.min(Math.max(20, fontSize + 10), h + 10);
     createSvg("rect", {
       x: rectX + rectW / 2 - labelW / 2,
@@ -953,7 +1189,7 @@ function renderPeriod(element, width, axisY, colors) {
     fill: style === "rail" ? colors.text : ["outline", "soft", "bracket"].includes(style) ? element.color : "#ffffff",
     "pointer-events": "none",
   }, group);
-  text.textContent = element.title;
+  text.textContent = truncateText(element.title || "Période", textWidth, fontSize);
   state.bboxes.set(element.id, { x: rectX, y, width: rectW, height: h, kind: "period" });
 }
 
@@ -1103,10 +1339,14 @@ function renderEvent(element, width, axisY, colors) {
     const title = createSvg("text", { x: textX, y: top + 34, "font-size": element.fontSize || 11, "font-weight": 800, fill: textColor, "text-anchor": anchor }, group);
     title.textContent = truncateText(element.title || "Événement", textWidth, Number(element.fontSize || 11));
   }
-  if (element.description && !compact) {
+  const descSize = Math.max(9, Number(element.fontSize || 11) - 1);
+  const descLineHeight = descSize * 1.25;
+  const descTop = top + 49;
+  const descLines = Math.max(0, Math.floor((top + h - descTop - 6) / descLineHeight));
+  if (element.description && !compact && descLines > 0) {
     const descStart = cardX + 10;
     const descEnd = cardX + cardW - 10;
-    drawWrappedText(group, element.description, alignedTextX(descStart, descEnd, element.align), top + 49, descEnd - descStart, Math.max(9, Number(element.fontSize || 11) - 1), element.fillMode === "color" ? "#ffffff" : colors.muted, 2, svgAnchor(element.align));
+    drawWrappedText(group, element.description, alignedTextX(descStart, descEnd, element.align), descTop, descEnd - descStart, descSize, element.fillMode === "color" ? "#ffffff" : colors.muted, Math.min(2, descLines), svgAnchor(element.align));
   }
   if (element.image) {
     createSvg("image", { href: element.image, x: cardX + cardW - 58, y: top + h - 58, width: 44, height: 44, preserveAspectRatio: "xMidYMid slice", opacity: 0.9 }, group);
@@ -1381,6 +1621,10 @@ function fieldsFor(element) {
         { value: "span", label: "Boîte de début à fin" },
         { value: "center", label: "Centré avec lignes" },
       ] },
+      { key: "track", label: "Ligne comparaison", type: "select", options: [
+        { value: "top", label: "Ligne A" },
+        { value: "bottom", label: "Ligne B" },
+      ] },
       { key: "description", label: "Description", type: "textarea" },
       { key: "image", label: "URL de l'image", type: "url" },
       { key: "iconKey", label: "Icône", type: "select", options: [
@@ -1422,6 +1666,10 @@ function fieldsFor(element) {
       { key: "title", label: "Texte", type: "text" },
       { key: "start", label: "Début", type: "number" },
       { key: "end", label: "Fin", type: "number" },
+      { key: "track", label: "Ligne comparaison", type: "select", options: [
+        { value: "top", label: "Ligne A" },
+        { value: "bottom", label: "Ligne B" },
+      ] },
       { key: "periodStyle", label: "Style de période", type: "select", options: [
         { value: "band", label: "Bande pleine" },
         { value: "capsule", label: "Capsule" },
@@ -1445,6 +1693,10 @@ function fieldsFor(element) {
       { key: "title", label: "Libellé", type: "text" },
       { key: "start", label: "Début", type: "number" },
       { key: "end", label: "Fin", type: "number" },
+      { key: "track", label: "Ligne comparaison", type: "select", options: [
+        { value: "top", label: "Ligne A" },
+        { value: "bottom", label: "Ligne B" },
+      ] },
       { key: "guides", label: "Repères pointillés", type: "select", options: [
         { value: "true", label: "Oui" },
         { value: "false", label: "Non" },
@@ -1669,21 +1921,50 @@ function applyCompactPdfStyle() {
 function declutterSelected() {
   const targets = selectionTargets(true).filter((element) => element.type !== "line" && element.type !== "arrow");
   if (!targets.length) return;
-  const lanes = [-188, -126, -64, 52, 108, 166];
+  const lanes = [-240, -178, -116, -54, 58, 120, 182, 244];
   const sorted = targets.slice().sort((a, b) => Number(a.date ?? a.start ?? 0) - Number(b.date ?? b.start ?? 0));
-  let laneIndex = 0;
+  const lastByLane = lanes.map(() => -Infinity);
+  const gap = Math.max(1, projectBounds().range * 0.035);
   pushHistory();
-  sorted.forEach((element, index) => {
-    if (index > 0) {
-      const prev = sorted[index - 1];
-      const prevDate = Number(prev.date ?? prev.start ?? 0);
-      const currentDate = Number(element.date ?? element.start ?? 0);
-      if (Math.abs(currentDate - prevDate) < Math.max(1, projectBounds().range * 0.04)) laneIndex += 1;
-    }
+  sorted.forEach((element) => {
+    const currentDate = Number(element.date ?? element.start ?? 0);
+    let laneIndex = lastByLane.findIndex((date) => Math.abs(currentDate - date) >= gap);
+    if (laneIndex < 0) laneIndex = lastByLane.indexOf(Math.min(...lastByLane));
     element.y = lanes[laneIndex % lanes.length];
+    lastByLane[laneIndex] = currentDate;
+    keepElementInProject(element);
   });
   renderAll();
   saveStore("Chevauchements réduits");
+}
+
+function cleanProject() {
+  const project = currentProject();
+  if (!project) return;
+  pushHistory();
+  const before = project.elements.length;
+  project.elements = project.elements.filter((element) => {
+    if (element.type === "image") return Boolean(element.image || element.title);
+    if (element.type === "text" || element.type === "annotation") return Boolean(String(element.text || element.title || "").trim());
+    return true;
+  });
+  project.elements.forEach((element) => {
+    keepElementInProject(element, project);
+    if ("track" in element) element.track = element.track || "top";
+    if (element.type === "event") {
+      element.width = clamp(Number(element.width || 150), 90, 360);
+      element.height = clamp(Number(element.height || 54), 42, 180);
+      element.fontSize = clamp(Number(element.fontSize || 11), 8, 22);
+    }
+    if (element.type === "period") {
+      element.height = clamp(Number(element.height || 28), 16, 80);
+      element.fontSize = clamp(Number(element.fontSize || 14), 8, 24);
+    }
+  });
+  project.elements.sort((a, b) => Number(a.date ?? a.start ?? 0) - Number(b.date ?? b.start ?? 0));
+  clearSelection(false);
+  renderAll();
+  saveStore(before === project.elements.length ? "Projet nettoyé" : `${before - project.elements.length} élément vide supprimé`);
 }
 
 function updateSelectionUi() {
@@ -1725,58 +2006,6 @@ function tidyElements() {
   saveStore("Frise rangée");
 }
 
-function addMicroStory() {
-  const project = currentProject();
-  const { start, end } = projectBounds(project);
-  const stories = [
-    ["Grande réunion inutile", "Tout le monde confirme qu'il faudra refaire une réunion plus courte.", "theatre"],
-    ["Incident de sandales", "Une personne importante arrive trop sûre d'elle pour que ce soit discret.", "etoile"],
-    ["Débat sur la couleur", "La civilisation hésite entre bleu sérieux et rouge beaucoup trop dramatique.", "plume"],
-    ["Carte mal orientée", "On découvre que tourner la carte règle presque tous les problèmes.", "globe"],
-    ["Prototype courageux", "L'invention fonctionne une fois, puis demande une pause.", "science"],
-    ["Erreur de calendrier", "Quelqu'un écrit la bonne date au mauvais siècle avec aplomb.", "livre"],
-    ["Pause héroïque", "Le projet avance grâce à une collation placée au bon moment.", "coeur"],
-    ["Discours trop long", "Le public applaudit surtout parce qu'il a compris que c'était fini.", "theatre"],
-    ["Plan parfaitement vague", "La stratégie tient sur une ligne et beaucoup d'optimisme.", "eclair"],
-    ["Objet retrouvé", "On retrouve enfin l'outil indispensable exactement là où personne n'a cherché.", "etoile"],
-    ["Mode vestimentaire risquée", "Tout le monde prétend que c'était volontaire.", "coeur"],
-    ["Traité du détail", "Une décision minuscule reçoit une importance historique disproportionnée.", "plume"],
-    ["Course contre le retard", "L'événement arrive en retard mais se déclare officiellement prévu.", "eclair"],
-    ["Grand test public", "Le public trouve le défaut en trois secondes. Les experts prennent des notes.", "science"],
-    ["Triomphe administratif", "Un formulaire est rempli correctement du premier coup. La foule reste prudente.", "livre"],
-    ["Carte au trésor confuse", "Le trésor existe peut-être, mais la légende est très motivée.", "globe"],
-    ["Déclaration solennelle", "Tout le monde promet de garder les fichiers bien nommés cette fois.", "plume"],
-    ["Victoire du rangement", "Deux éléments ne se chevauchent plus. La frise respire.", "etoile"],
-    ["Bug diplomatique", "Deux camps accusent la même virgule d'avoir commencé le problème.", "theatre"],
-    ["Grande intuition", "Personne ne sait pourquoi, mais l'idée marche mieux en vert.", "science"],
-  ];
-  const palette = ["#c95f32", "#5762b7", "#1f7a6d", "#8c3d69", "#ad7a34", "#3f78aa"];
-  const lanes = [-220, -160, -100, 88, 148, 208];
-  const story = stories[Math.floor(Math.random() * stories.length)];
-  const range = Math.max(0, end - start);
-  const date = range > 0 ? Math.round(start + Math.random() * range) : Math.round((start + end) / 2);
-  pushHistory();
-  const element = event(
-    story[0],
-    date,
-    story[1],
-    story[2],
-    palette[Math.floor(Math.random() * palette.length)],
-    lanes[Math.floor(Math.random() * lanes.length)]
-  );
-  element.width = 172;
-  element.height = 54;
-  element.fontSize = 10;
-  element.shape = ["box", "sharp", "pill", "ticket"][Math.floor(Math.random() * 4)];
-  element.fillMode = Math.random() > 0.78 ? "color" : "white";
-  element.align = Math.random() > 0.65 ? "center" : "start";
-  keepElementInProject(element, project);
-  project.elements.push(element);
-  setSelection([element.id], false);
-  renderAll();
-  saveStore("Événement drôle ajouté");
-}
-
 function addSurpriseEvent() {
   const project = currentProject();
   const { start, end } = projectBounds(project);
@@ -1803,6 +2032,32 @@ function fitTimeline(save = true) {
   if (save) saveStore("Vue ajustée");
 }
 
+function startPresentation() {
+  showEditor();
+  clearSelection(false);
+  document.body.classList.add("presentation-mode");
+  const target = document.documentElement;
+  if (!document.fullscreenElement && target.requestFullscreen) {
+    target.requestFullscreen().catch(() => {
+      /* fullscreen can be blocked by the browser */
+    });
+  }
+  requestAnimationFrame(() => {
+    fitTimeline(false);
+    renderTimeline();
+  });
+}
+
+function stopPresentation(exitFullscreen = true) {
+  document.body.classList.remove("presentation-mode");
+  if (exitFullscreen && document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {
+      /* ignore browser fullscreen errors */
+    });
+  }
+  requestAnimationFrame(renderTimeline);
+}
+
 function selectElement(id) {
   setSelection([id]);
 }
@@ -1814,8 +2069,22 @@ function svgPoint(event) {
 
 function beginPointer(event) {
   const handle = event.target.closest("[data-handle]");
+  const legend = event.target.closest("[data-legend]");
   const selectable = event.target.closest("[data-id]");
   const point = svgPoint(event);
+  if (legend) {
+    const project = currentProject();
+    pushHistory();
+    state.dragging = {
+      mode: "legend",
+      startPoint: point,
+      original: { x: Number(project.legendX || 0), y: Number(project.legendY || 0) },
+      moved: false,
+    };
+    svg.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    return;
+  }
   if (handle) {
     const id = handle.dataset.id;
     const element = currentProject().elements.find((item) => item.id === id);
@@ -1864,11 +2133,19 @@ function movePointer(event) {
   const dx = point.x - state.dragging.startPoint.x;
   const dy = point.y - state.dragging.startPoint.y;
   const project = currentProject();
-  const { width } = getSize();
+  const { width, height } = getSize();
 
   if (state.dragging.mode === "marquee") {
     state.dragging.currentPoint = point;
     state.dragging.moved = Math.abs(dx) > 4 || Math.abs(dy) > 4;
+    renderTimeline();
+    return;
+  }
+
+  if (state.dragging.mode === "legend") {
+    project.legendX = clamp(Number(state.dragging.original.x) + dx, 10, width - 80);
+    project.legendY = clamp(Number(state.dragging.original.y) + dy, 10, height - 60);
+    state.dragging.moved = Math.abs(dx) > 3 || Math.abs(dy) > 3;
     renderTimeline();
     return;
   }
@@ -1889,7 +2166,7 @@ function movePointer(event) {
           element.end = Math.round(element.start + duration);
         }
       }
-      element.y = Math.round(Number(original.y || 0) + dy);
+      element.y = Math.round(Number(original.y || 0) + (project.orientation === "vertical" ? dx : dy));
       keepElementInProject(element);
     });
     renderTimeline();
@@ -2151,7 +2428,6 @@ function bindEvents() {
   $("#surpriseBtn").addEventListener("click", addSurpriseEvent);
   $("#colorPartyBtn").addEventListener("click", applySurprisePalette);
   $("#tidyBtn").addEventListener("click", tidyElements);
-  $("#microStoryBtn").addEventListener("click", addMicroStory);
   $("#advancedToggleBtn").addEventListener("click", toggleAdvancedEditor);
   $("#selectAllBtn").addEventListener("click", selectAllElements);
   $("#deleteSelectionBtn").addEventListener("click", deleteSelected);
@@ -2160,8 +2436,10 @@ function bindEvents() {
   $("#alternateLanesBtn").addEventListener("click", alternateSelectedLanes);
   $("#compactPdfBtn").addEventListener("click", applyCompactPdfStyle);
   $("#declutterBtn").addEventListener("click", declutterSelected);
+  $("#cleanProjectBtn").addEventListener("click", cleanProject);
   $("#invertSelectionBtn").addEventListener("click", invertSelection);
   $("#bulkColorBtn").addEventListener("click", applyBulkColor);
+  $("#presentationBtn").addEventListener("click", startPresentation);
   $("#exportBinBtn").addEventListener("click", () => {
     if (explainBinExport()) exportBin();
   });
@@ -2218,6 +2496,18 @@ function bindEvents() {
     saveStore("Format choisi");
   });
   $("#projectStyleInput").addEventListener("change", (event) => updateProjectSetting("style", event.target.value, "Style changé"));
+  $("#orientationInput").addEventListener("change", (event) => updateProjectSetting("orientation", event.target.value, "Orientation changée"));
+  $("#compareModeInput").addEventListener("change", (event) => updateProjectSetting("compareMode", event.target.value, "Mode changé"));
+  $("#legendInput").addEventListener("change", (event) => updateProjectSetting("legendMode", event.target.value, "Légende modifiée"));
+  $("#legendTextInput").addEventListener("input", (event) => {
+    const project = currentProject();
+    if (!project) return;
+    project.legendText = event.target.value;
+    renderTimeline();
+    scheduleSave();
+  });
+  $("#legendFromFriseBtn").addEventListener("click", fillManualLegendFromFrise);
+  $("#clearLegendBtn").addEventListener("click", clearManualLegend);
   $("#tickStepInput").addEventListener("change", (event) => updateProjectSetting("tickStep", event.target.value, "Graduation changée"));
   $("#minorTicksInput").addEventListener("change", (event) => updateProjectSetting("minorTicks", Number(event.target.value), "Détails changés"));
   $("#axisPositionInput").addEventListener("change", (event) => updateProjectSetting("axisPosition", Number(event.target.value), "Axe déplacé"));
@@ -2247,6 +2537,11 @@ function bindEvents() {
   });
 
   window.addEventListener("resize", renderTimeline);
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement && document.body.classList.contains("presentation-mode")) {
+      stopPresentation(false);
+    }
+  });
   document.addEventListener("keydown", handleShortcuts);
 }
 
@@ -2262,6 +2557,13 @@ function showEditor() {
 function handleShortcuts(event) {
   const activeTag = document.activeElement?.tagName;
   const editingText = ["INPUT", "TEXTAREA", "SELECT"].includes(activeTag);
+  if (document.body.classList.contains("presentation-mode")) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      stopPresentation();
+      return;
+    }
+  }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
     event.preventDefault();
     saveStore("Sauvegardé");

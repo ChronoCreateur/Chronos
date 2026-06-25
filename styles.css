@@ -789,6 +789,29 @@ body.has-selection .projects-section {
   display: grid;
 }
 
+body.presentation-mode .topbar,
+body.presentation-mode .left-panel,
+body.presentation-mode .workspace-top {
+  display: none !important;
+}
+
+body.presentation-mode {
+  overflow: hidden;
+}
+
+body.presentation-mode .app-shell {
+  height: 100vh;
+  grid-template-columns: 1fr;
+}
+
+body.presentation-mode .workspace-wrap {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+body.presentation-mode .workspace::after {
+  inset: 10px;
+}
+
 .axis-line {
   stroke: var(--text);
   stroke-width: 2.5;
@@ -875,7 +898,8 @@ body.has-selection .projects-section {
 .properties-form select,
 .properties-form textarea,
 .left-panel input,
-.left-panel select {
+.left-panel select,
+.left-panel textarea {
   width: 100%;
   min-height: 30px;
   border: 1px solid var(--line);
@@ -888,6 +912,26 @@ body.has-selection .projects-section {
 .properties-form textarea {
   min-height: 56px;
   resize: vertical;
+}
+
+.left-panel textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.legend-actions {
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  gap: 6px;
+  margin: -2px 0 8px;
+}
+
+.legend-box {
+  cursor: grab;
+}
+
+.legend-box:active {
+  cursor: grabbing;
 }
 
 .split-fields {

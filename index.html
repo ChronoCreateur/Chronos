@@ -6,7 +6,7 @@
     <meta name="description" content="ChronoCréateur, logiciel web statique de création de frises chronologiques." />
     <title>ChronoCréateur</title>
     <link rel="icon" href="./favicon.svg?v=20260623-svgonly" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260622-touch-v8" />
+    <link rel="stylesheet" href="styles.css?v=20260625-legend-drag-v12" />
   </head>
   <body class="landing-mode">
     <section class="landing-page" id="landingPage" aria-label="Accueil ChronoCréateur">
@@ -136,6 +136,36 @@
             </select>
           </label>
           <div class="split-fields">
+            <label>Orientation
+              <select id="orientationInput">
+                <option value="horizontal">Horizontale</option>
+                <option value="vertical">Verticale</option>
+              </select>
+            </label>
+            <label>Mode
+              <select id="compareModeInput">
+                <option value="single">Simple</option>
+                <option value="compare">Comparaison</option>
+              </select>
+            </label>
+          </div>
+          <label>Légende
+            <select id="legendInput">
+              <option value="manual">Manuelle</option>
+              <option value="auto">Automatique</option>
+              <option value="hidden">Masquer</option>
+            </select>
+          </label>
+          <div id="legendManualControls" class="legend-manual-controls">
+            <label>Entrées de légende
+              <textarea id="legendTextInput" placeholder="Guerre = #c95f32&#10;Sciences = #5762b7&#10;Culture = #1f7a6d"></textarea>
+            </label>
+            <div class="legend-actions">
+              <button class="text-button" id="legendFromFriseBtn" type="button">Remplir avec la frise</button>
+              <button class="text-button" id="clearLegendBtn" type="button">Vider</button>
+            </div>
+          </div>
+          <div class="split-fields">
             <label>Graduation
               <select id="tickStepInput">
                 <option value="auto">Auto</option>
@@ -192,7 +222,7 @@
           <div class="bonus-actions">
             <button class="text-button" id="colorPartyBtn" type="button">Changer les couleurs</button>
             <button class="text-button" id="tidyBtn" type="button">Ranger verticalement</button>
-            <button class="text-button" id="microStoryBtn" type="button">Événement drôle</button>
+            <button class="text-button" id="presentationBtn" type="button">Présentation</button>
             <button class="primary-button" id="advancedToggleBtn" type="button">Ouvrir éditeur avancé</button>
           </div>
           <div class="advanced-section is-collapsed" id="advancedEditorPanel">
@@ -208,6 +238,7 @@
               <button class="text-button" id="alternateLanesBtn" type="button">Alterner haut/bas</button>
               <button class="text-button" id="compactPdfBtn" type="button">Style PDF compact</button>
               <button class="text-button" id="declutterBtn" type="button">Désencombrer</button>
+              <button class="text-button" id="cleanProjectBtn" type="button">Nettoyer projet</button>
               <button class="text-button" id="invertSelectionBtn" type="button">Inverser sélection</button>
             </div>
             <label class="bulk-color-row">Couleur groupée
@@ -275,6 +306,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260623-funny-one-v22"></script>
+    <script src="app.js?v=20260625-no-funny-overflow-v27"></script>
   </body>
 </html>
